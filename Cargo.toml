@@ -8,3 +8,4 @@ edition = "2018"
 isometric = { path = "../isometric" }
 pioneer = { path = "../pioneer" }
 nalgebra = "0.17.2"
+image = "0.21.0"
