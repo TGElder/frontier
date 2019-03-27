@@ -113,9 +113,10 @@ impl TerrainHandler {
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.3, 0.3, 0.3, 1.0);
         let mut texture = Texture::new();
-        texture.load(image::open("texture.jpg").unwrap());
+        texture.load(image::open("tuskdale.png").unwrap());
         vec![
-            Command::Draw{name: "sea".to_string(), drawing: Box::new(Canvas::new(texture))},
+            Command::Draw{name: "label".to_string(), drawing: Box::new(Canvas::new(texture))},
+            Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
             Command::Draw{name: "tiles".to_string(), drawing: self.draw_tiles()},
             Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
             Command::Draw{name: "rivers_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.river_nodes, river_color, 0.0))},
