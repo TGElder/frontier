@@ -8,6 +8,8 @@ use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
 use isometric::M;
+use isometric::Texture;
+use isometric::drawing::Canvas;
 
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;
@@ -23,61 +25,32 @@ use std::sync::Arc;
 
 fn main() {
 
+    let mut mesh = Mesh::new(1, 0.0);
+    mesh.set_z(0, 0, MAX);
+    let seed = 18;
+    let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0, Box::new(CanvasHandler{}));
+    for i in 0..9 {
+        mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
+        if i < 9 {
+            let threshold = i * 2;
+            mesh = Erosion::erode(mesh, &mut rng, threshold, 8);
+        }
+        println!("{}-{}", i, mesh.get_width());
+    }
 
-    // let mut mesh = Mesh::new(1, 0.0);
-    // mesh.set_z(0, 0, MAX);
-    // let seed = 18;
-    // let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
+    let sea_level = 0.5;
+    let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
+    let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
 
-    // for i in 0..10 {
-    //     mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
-    //     if i < 9 {
-    //         let threshold = i * 2;
-    //         mesh = Erosion::erode(mesh, &mut rng, threshold, 8);
-    //     }
-    //     println!("{}-{}", i, mesh.get_width());
-    // }
-
-    // let sea_level = 0.5;
-    // let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
-    // let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
-
-    // mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
-    // let terrain = mesh.get_z_vector().map(|z| z as f32);
+    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
+    let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    // let terrain_handler = TerrainHandler::new(terrain, junctions, rivers, sea_level as f32);
-    // let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0, Box::new(terrain_handler));
+    let terrain_handler = TerrainHandler::new(terrain, junctions, rivers, sea_level as f32);
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0, Box::new(terrain_handler));
     
     engine.run();
    
-}
-
-pub struct CanvasHandler {
-
-}
-
-impl EventHandler for CanvasHandler {
-
-    fn handle_event(&mut self, event: Arc<Event>) -> Vec<Command> {
-        use isometric::Texture;
-        use isometric::drawing::Canvas;
-
-        match *event {
-            Event::Start => {
-                let mut texture = Texture::new();
-                texture.load(image::open("texture.jpg").unwrap());
-                
-                let drawing = Canvas::new(texture);
-                vec![Command::Draw{name: "canvas".to_string(), drawing: Box::new(drawing)}]
-
-            },
-            _ => vec![]
-        }
-    }
-
-
 }
 
 pub struct TerrainHandler {
@@ -139,8 +112,10 @@ impl TerrainHandler {
         self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.3, 0.3, 0.3, 1.0);
+        let mut texture = Texture::new();
+        texture.load(image::open("texture.jpg").unwrap());
         vec![
-            Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
+            Command::Draw{name: "sea".to_string(), drawing: Box::new(Canvas::new(texture))},
             Command::Draw{name: "tiles".to_string(), drawing: self.draw_tiles()},
             Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
             Command::Draw{name: "rivers_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.river_nodes, river_color, 0.0))},
@@ -158,7 +133,11 @@ impl TerrainHandler {
         let mut colors: M<Color> = M::from_element(width, height, green);
         for x in 0..self.heights.shape().0 - 1 {
             for y in 0..self.heights.shape().1 - 1 {
-                if (self.heights[(x, y)] - self.heights[(x + 1, y)]).abs() > 0.533333333 || (self.heights[(x, y)]- self.heights[(x, y + 1)]).abs() > 0.533333333 {
+                if (self.heights[(x, y)] - self.heights[(x + 1, y)]).abs() > 0.533333333 
+                || (self.heights[(x + 1, y)]- self.heights[(x + 1, y + 1)]).abs() > 0.533333333 
+                || (self.heights[(x + 1, y + 1)]- self.heights[(x, y + 1)]).abs() > 0.533333333 
+                || (self.heights[(x, y + 1)]- self.heights[(x, y)]).abs() > 0.533333333    
+                {
                     colors[(x, y)] = grey;
                 }
             }
