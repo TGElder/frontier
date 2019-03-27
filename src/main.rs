@@ -68,6 +68,7 @@ impl EventHandler for CanvasHandler {
             Event::Start => {
                 let mut texture = Texture::new();
                 texture.load(image::open("texture.jpg").unwrap());
+                
                 let drawing = Canvas::new(texture);
                 vec![Command::Draw{name: "canvas".to_string(), drawing: Box::new(drawing)}]
 
