@@ -31,7 +31,7 @@ fn main() {
     let seed = 18;
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
-    for i in 0..7 {
+    for i in 0..9 {
         mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
         if i < 9 {
             let threshold = i * 2;
@@ -114,10 +114,10 @@ impl TerrainHandler {
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.3, 0.3, 0.3, 1.0);
         let mut texture = Texture::new();
-        texture.load(image::open("dejavu.png").unwrap());
-        let font = Font::from_csv_and_texture("dejavu.csv", texture);
+        texture.load(image::open("serif.png").unwrap());
+        let font = Font::from_csv_and_texture("serif.csv", texture);
         vec![
-            Command::Draw{name: "label".to_string(), drawing: Box::new(Text::new("Tuskdale", v3(86.0, 86.0, 0.0), font))},
+            Command::Draw{name: "label".to_string(), drawing: Box::new(Text::new("Tuskdale", v3(344.0, 344.0, 0.0), font))},
             Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
             Command::Draw{name: "tiles".to_string(), drawing: self.draw_tiles()},
             Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
