@@ -29,7 +29,7 @@ fn main() {
 
     let mut mesh = Mesh::new(1, 0.0);
     mesh.set_z(0, 0, MAX);
-    let seed = 18;
+    let seed = 181;
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
     for i in 0..9 {
@@ -123,7 +123,7 @@ impl TerrainHandler {
     fn draw_terrain(&mut self) -> Vec<Command> {
         self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
-        let road_color = Color::new(0.3, 0.3, 0.3, 1.0);
+        let road_color = Color::new(0.54, 0.27, 0.07, 1.0);
     
         vec![
             Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
@@ -139,7 +139,7 @@ impl TerrainHandler {
         let width = (self.heights.shape().0) - 1;
         let height = (self.heights.shape().1) - 1;
         let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
-        let green = Color::new(0.0, 1.0, 0.0, 1.0);
+        let green = Color::new(0.0, 0.75, 0.0, 1.0);
         let grey = Color::new(0.75, 0.75, 0.75, 1.0);
         let mut colors: M<Color> = M::from_element(width, height, green);
         for x in 0..self.heights.shape().0 - 1 {
@@ -176,7 +176,10 @@ impl EventHandler for TerrainHandler {
                     ..
                     }
                 ) => {self.label_editor = None; vec![]},
-                _ => {label_editor.text_editor.handle_event(event.clone()); vec![Command::Draw{name: format!("{:?}", label_editor.world_coord), drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.world_coord(), self.font.clone()))}]},
+                _ => {
+                    label_editor.text_editor.handle_event(event.clone());
+                    let name = format!("{:?}", label_editor.world_coord());
+                    vec![Command::Draw{name, drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.world_coord(), self.font.clone()))}]},
             }
         } else {
             let mut out = vec![];
@@ -227,7 +230,14 @@ impl EventHandler for TerrainHandler {
                                     self.road_nodes.push(Node::new(from, 0.0, 0.05));
                                     self.road_nodes.push(Node::new(to, 0.0, 0.05));
                                 }
-                                self.roads.push(Edge::new(from, to));
+                                let edge = Edge::new(from, to);
+                                if !self.roads.contains(&edge) {
+                                    self.roads.push(edge);
+                                } else {
+                                    let index = self.roads.iter().position(|other| *other == edge).unwrap();
+                                    self.roads.remove(index);
+                                }
+                                
                                 self.draw_terrain()
                             } else {
                                 vec![]
@@ -269,6 +279,6 @@ struct LabelEditor {
 
 impl LabelEditor {
     fn world_coord(&self) -> V3<f32> {
-        v3(self.world_coord.x, self.world_coord.y, self.world_coord.z)
+        v3(self.world_coord.x.floor(), self.world_coord.y.floor(), self.world_coord.z.floor())
     }
 }
