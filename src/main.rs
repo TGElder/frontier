@@ -123,7 +123,7 @@ impl TerrainHandler {
     fn draw_terrain(&mut self) -> Vec<Command> {
         self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
-        let road_color = Color::new(0.54, 0.27, 0.07, 1.0);
+        let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
     
         vec![
             Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
@@ -140,7 +140,7 @@ impl TerrainHandler {
         let height = (self.heights.shape().1) - 1;
         let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
         let green = Color::new(0.0, 0.75, 0.0, 1.0);
-        let grey = Color::new(0.75, 0.75, 0.75, 1.0);
+        let grey = Color::new(0.5, 0.4, 0.3, 1.0);
         let mut colors: M<Color> = M::from_element(width, height, green);
         for x in 0..self.heights.shape().0 - 1 {
             for y in 0..self.heights.shape().1 - 1 {
@@ -223,19 +223,23 @@ impl EventHandler for TerrainHandler {
                             let to_z = self.heights[(to.x, to.y)];
                             let rise = if from_z > to_z {from_z - to_z} else{to_z - from_z};
                             if rise * 187.5 < 100.0 {
-                                if from.x == to.x {
-                                    self.road_nodes.push(Node::new(from, 0.05, 0.0));
-                                    self.road_nodes.push(Node::new(to, 0.05, 0.0));
-                                } else {
-                                    self.road_nodes.push(Node::new(from, 0.0, 0.05));
-                                    self.road_nodes.push(Node::new(to, 0.0, 0.05));
-                                }
+                                
                                 let edge = Edge::new(from, to);
                                 if !self.roads.contains(&edge) {
                                     self.roads.push(edge);
                                 } else {
                                     let index = self.roads.iter().position(|other| *other == edge).unwrap();
                                     self.roads.remove(index);
+                                }
+                                self.road_nodes = vec![];
+                                for edge in self.roads.iter() {
+                                    if !edge.horizontal() {
+                                        self.road_nodes.push(Node::new(*edge.from(), 0.05, 0.0));
+                                        self.road_nodes.push(Node::new(*edge.to(), 0.05, 0.0));
+                                    } else {
+                                        self.road_nodes.push(Node::new(*edge.from(), 0.0, 0.05));
+                                        self.road_nodes.push(Node::new(*edge.to(), 0.0, 0.05));
+                                    }
                                 }
                                 
                                 self.draw_terrain()
