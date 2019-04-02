@@ -2,12 +2,13 @@ extern crate nalgebra as na;
 extern crate image;
 
 use isometric::events::EventHandler;
+use isometric::event_handlers::*;
 use isometric::Color;
 use isometric::{Command, Event, IsometricEngine};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
-use isometric::{M, v3};
+use isometric::{M, V3, v3};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
@@ -47,8 +48,8 @@ fn main() {
     mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
     let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    let terrain_handler = TerrainHandler::new(terrain, junctions, rivers, sea_level as f32);
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0, Box::new(terrain_handler));
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0);
+    engine.add_event_handler(Box::new(TerrainHandler::new(terrain, junctions, rivers, sea_level as f32)));
     
     engine.run();
    
@@ -63,10 +64,14 @@ pub struct TerrainHandler {
     sea_level: f32,
     world_coord: Option<WorldCoord>,
     terrain: Terrain,
+    font: Arc<Font>,
+    label_editor: Option<LabelEditor>,
+    event_handlers: Vec<Box<EventHandler>>,
 }
 
 impl TerrainHandler {
     pub fn new(heights: na::DMatrix<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> TerrainHandler {
+
         TerrainHandler{
             sea_level,
             world_coord: None,
@@ -76,6 +81,12 @@ impl TerrainHandler {
             rivers,
             road_nodes: vec![],
             roads: vec![],
+            font: Arc::new(Font::from_csv_and_texture("serif.csv", Texture::new(image::open("serif.png").unwrap()))),
+            label_editor: None,
+            event_handlers: vec![
+                Box::new(RotateHandler::new()),
+                Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
+            ]
         }
     }
 }
@@ -113,11 +124,8 @@ impl TerrainHandler {
         self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.3, 0.3, 0.3, 1.0);
-        let mut texture = Texture::new();
-        texture.load(image::open("serif.png").unwrap());
-        let font = Font::from_csv_and_texture("serif.csv", texture);
+    
         vec![
-            Command::Draw{name: "label".to_string(), drawing: Box::new(Text::new("Tuskdale", v3(344.0, 344.0, 0.0), font))},
             Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
             Command::Draw{name: "tiles".to_string(), drawing: self.draw_tiles()},
             Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
@@ -153,16 +161,13 @@ impl EventHandler for TerrainHandler {
 
     fn handle_event(&mut self, event: Arc<Event>) -> Vec<Command> {
 
-        let mut out = vec![];
-        out.append(
-            &mut match *event {
-                Event::Start => self.draw_terrain(),
-                Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![self.select_cell()]},
+        if let Some(label_editor) = &mut self.label_editor {
+            match *event {
                 Event::GlutinEvent(
                     glutin::Event::WindowEvent{
                         event: glutin::WindowEvent::KeyboardInput{
                             input: glutin::KeyboardInput{
-                                virtual_keycode: Some(glutin::VirtualKeyCode::R), 
+                                virtual_keycode: Some(glutin::VirtualKeyCode::Return), 
                                 state: glutin::ElementState::Pressed,
                                 ..
                             },
@@ -170,46 +175,100 @@ impl EventHandler for TerrainHandler {
                         },
                     ..
                     }
-                ) => {
-                    if let Some(world_coord) = self.world_coord {
-                        let cell_x = world_coord.x.floor();
-                        let cell_y = world_coord.y.floor();
-                        let distance_to_left = world_coord.x - cell_x;
-                        let distance_to_right = (cell_x + 1.0) - world_coord.x;
-                        let distance_to_bottom = world_coord.y - cell_y;
-                        let distance_to_top = (cell_y + 1.0) - world_coord.y; 
-                        let min = distance_to_left.min(distance_to_right).min(distance_to_top).min(distance_to_bottom);
-                        let (from, to) = match min {
-                            d if d == distance_to_left => (na::Vector2::new(cell_x as usize, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize)),
-                            d if d == distance_to_right => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize + 1, cell_y as usize)),
-                            d if d == distance_to_bottom => (na::Vector2::new(cell_x as usize + 1, cell_y as usize), na::Vector2::new(cell_x as usize, cell_y as usize)),
-                            d if d == distance_to_top => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize + 1)),
-                            _ => panic!("Should not happen: minimum of four values does not match any of those values"),
-                        };
-                        let from_z = self.heights[(from.x, from.y)];
-                        let to_z = self.heights[(to.x, to.y)];
-                        let rise = if from_z > to_z {from_z - to_z} else{to_z - from_z};
-                        if rise * 187.5 < 100.0 {
-                            if from.x == to.x {
-                                self.road_nodes.push(Node::new(from, 0.05, 0.0));
-                                self.road_nodes.push(Node::new(to, 0.05, 0.0));
+                ) => {self.label_editor = None; vec![]},
+                _ => {label_editor.text_editor.handle_event(event.clone()); vec![Command::Draw{name: format!("{:?}", label_editor.world_coord), drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.world_coord(), self.font.clone()))}]},
+            }
+        } else {
+            let mut out = vec![];
+            let event_handlers = &mut self.event_handlers;
+            for mut event_handler in event_handlers {
+                out.append(&mut event_handler.handle_event(event.clone()));
+            }
+            out.append(
+                &mut match *event {
+                    Event::Start => self.draw_terrain(),
+                    Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![self.select_cell()]},
+                    Event::GlutinEvent(
+                        glutin::Event::WindowEvent{
+                            event: glutin::WindowEvent::KeyboardInput{
+                                input: glutin::KeyboardInput{
+                                    virtual_keycode: Some(glutin::VirtualKeyCode::R), 
+                                    state: glutin::ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                            },
+                        ..
+                        }
+                    ) => {
+                        if let Some(world_coord) = self.world_coord {
+                            let cell_x = world_coord.x.floor();
+                            let cell_y = world_coord.y.floor();
+                            let distance_to_left = world_coord.x - cell_x;
+                            let distance_to_right = (cell_x + 1.0) - world_coord.x;
+                            let distance_to_bottom = world_coord.y - cell_y;
+                            let distance_to_top = (cell_y + 1.0) - world_coord.y; 
+                            let min = distance_to_left.min(distance_to_right).min(distance_to_top).min(distance_to_bottom);
+                            let (from, to) = match min {
+                                d if d == distance_to_left => (na::Vector2::new(cell_x as usize, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize)),
+                                d if d == distance_to_right => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize + 1, cell_y as usize)),
+                                d if d == distance_to_bottom => (na::Vector2::new(cell_x as usize + 1, cell_y as usize), na::Vector2::new(cell_x as usize, cell_y as usize)),
+                                d if d == distance_to_top => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize + 1)),
+                                _ => panic!("Should not happen: minimum of four values does not match any of those values"),
+                            };
+                            let from_z = self.heights[(from.x, from.y)];
+                            let to_z = self.heights[(to.x, to.y)];
+                            let rise = if from_z > to_z {from_z - to_z} else{to_z - from_z};
+                            if rise * 187.5 < 100.0 {
+                                if from.x == to.x {
+                                    self.road_nodes.push(Node::new(from, 0.05, 0.0));
+                                    self.road_nodes.push(Node::new(to, 0.05, 0.0));
+                                } else {
+                                    self.road_nodes.push(Node::new(from, 0.0, 0.05));
+                                    self.road_nodes.push(Node::new(to, 0.0, 0.05));
+                                }
+                                self.roads.push(Edge::new(from, to));
+                                self.draw_terrain()
                             } else {
-                                self.road_nodes.push(Node::new(from, 0.0, 0.05));
-                                self.road_nodes.push(Node::new(to, 0.0, 0.05));
+                                vec![]
                             }
-                            self.roads.push(Edge::new(from, to));
-                            self.draw_terrain()
                         } else {
                             vec![]
                         }
-                    } else {
-                        vec![]
-                    }
+                    },
+                    Event::GlutinEvent(
+                        glutin::Event::WindowEvent{
+                            event: glutin::WindowEvent::KeyboardInput{
+                                input: glutin::KeyboardInput{
+                                    virtual_keycode: Some(glutin::VirtualKeyCode::L), 
+                                    state: glutin::ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                            },
+                        ..
+                        }
+                    ) => {if let Some(world_coord) = self.world_coord {
+                        self.label_editor = Some(LabelEditor{world_coord: world_coord, text_editor: TextEditor::new()}); 
+                    }; vec![]},
+                    _ => vec![],
                 }
-                _ => vec![],
-            }
-        );
-        out
+            );
+            out
+        }
+
     }
 
+}
+
+struct LabelEditor {
+    world_coord: WorldCoord,
+    text_editor: TextEditor
+
+}
+
+impl LabelEditor {
+    fn world_coord(&self) -> V3<f32> {
+        v3(self.world_coord.x, self.world_coord.y, self.world_coord.z)
+    }
 }
