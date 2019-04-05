@@ -42,13 +42,13 @@ fn main() {
     }
 
     let sea_level = 0.5;
-    let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
+    let before_sea_level = Scale::new((0.0, 64.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
     let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
 
-    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
+    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 64.0)));
     let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0);
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 64.0);
     engine.add_event_handler(Box::new(TerrainHandler::new(terrain, junctions, rivers, sea_level as f32)));
     
     engine.run();
@@ -67,6 +67,7 @@ pub struct TerrainHandler {
     font: Arc<Font>,
     label_editor: Option<LabelEditor>,
     event_handlers: Vec<Box<EventHandler>>,
+    text_commands: Vec<Command>,
 }
 
 impl TerrainHandler {
@@ -86,7 +87,8 @@ impl TerrainHandler {
             event_handlers: vec![
                 Box::new(RotateHandler::new()),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
-            ]
+            ],
+            text_commands: vec![]
         }
     }
 }
@@ -178,8 +180,10 @@ impl EventHandler for TerrainHandler {
                 ) => {self.label_editor = None; vec![]},
                 _ => {
                     label_editor.text_editor.handle_event(event.clone());
-                    let name = format!("{:?}", label_editor.world_coord());
-                    vec![Command::Draw{name, drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.world_coord(), self.font.clone()))}]},
+                    let position = label_editor.world_coord;
+                    let name = format!("{:?}", label_editor.v3());
+                    text_commands.append()
+                    vec![Command::DrawText{name, position, drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.v3(), self.font.clone()))}]},
             }
         } else {
             let mut out = vec![];
@@ -282,7 +286,7 @@ struct LabelEditor {
 }
 
 impl LabelEditor {
-    fn world_coord(&self) -> V3<f32> {
+    fn v3(&self) -> V3<f32> {
         v3(self.world_coord.x.floor(), self.world_coord.y.floor(), self.world_coord.z.floor())
     }
 }
