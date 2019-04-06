@@ -267,7 +267,7 @@ impl EventHandler for TerrainHandler {
                         ..
                         }
                     ) => {if let Some(world_coord) = self.world_coord {
-                        self.label_editor = Some(LabelEditor::new(world_coord)); 
+                        self.label_editor = Some(LabelEditor::new(world_coord, &self.heights)); 
                     }; vec![]},
                     _ => vec![],
                 }
@@ -287,8 +287,11 @@ struct LabelEditor {
 
 impl LabelEditor {
 
-    fn new(world_coord: WorldCoord) -> LabelEditor {
-        let world_coord = WorldCoord::new(world_coord.x.floor(), world_coord.y.floor(), world_coord.z.floor());
+    fn new(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> LabelEditor {
+        let x = world_coord.x.floor();
+        let y = world_coord.y.floor();
+        let z = heights[(x as usize, y as usize)];
+        let world_coord = WorldCoord::new(x, y, z);
 
         LabelEditor{world_coord, text_editor: TextEditor::new()}
     }
