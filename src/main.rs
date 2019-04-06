@@ -181,9 +181,9 @@ impl EventHandler for TerrainHandler {
                 _ => {
                     label_editor.text_editor.handle_event(event.clone());
                     let position = label_editor.world_coord;
-                    let name = format!("{:?}", label_editor.v3());
-                    text_commands.append()
-                    vec![Command::DrawText{name, position, drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.v3(), self.font.clone()))}]},
+                    let name = format!("{:?}", label_editor.world_coord);
+                    vec![Command::Draw{name, drawing: Box::new(Text::new(&label_editor.text_editor.text(), label_editor.world_coord, self.font.clone()))}]
+                },
             }
         } else {
             let mut out = vec![];
@@ -267,7 +267,7 @@ impl EventHandler for TerrainHandler {
                         ..
                         }
                     ) => {if let Some(world_coord) = self.world_coord {
-                        self.label_editor = Some(LabelEditor{world_coord: world_coord, text_editor: TextEditor::new()}); 
+                        self.label_editor = Some(LabelEditor::new(world_coord)); 
                     }; vec![]},
                     _ => vec![],
                 }
@@ -286,7 +286,10 @@ struct LabelEditor {
 }
 
 impl LabelEditor {
-    fn v3(&self) -> V3<f32> {
-        v3(self.world_coord.x.floor(), self.world_coord.y.floor(), self.world_coord.z.floor())
+
+    fn new(world_coord: WorldCoord) -> LabelEditor {
+        let world_coord = WorldCoord::new(world_coord.x.floor(), world_coord.y.floor(), world_coord.z.floor());
+
+        LabelEditor{world_coord, text_editor: TextEditor::new()}
     }
 }
