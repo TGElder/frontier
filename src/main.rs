@@ -90,7 +90,7 @@ impl TerrainHandler {
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
             text_commands: vec![],
-            tree_texture: Arc::new(Texture::new(image::open("tree.png").unwrap())),
+            tree_texture: Arc::new(Texture::new(image::open("texture.jpg").unwrap())),
         }
     }
 }
@@ -163,11 +163,13 @@ impl TerrainHandler {
 
     fn draw_tree(&self) -> Vec<Command> {
         if let Some(world_coord) = self.world_coord {
-            let x = world_coord.x.floor();
-            let y = world_coord.y.floor();
-            let z = self.heights[(x as usize, y as usize)] + 0.25;
-            let name = format!("tree@{:?}", world_coord).to_string();
-            vec![Command::Draw{name, drawing: Box::new(Billboard::new(world_coord, 0.5, 0.5, self.tree_texture.clone()))}]
+            if world_coord.x > 0.0 && world_coord.y > 0.0 {
+                let world_coord = WorldCoord::new(world_coord.x, world_coord.y, world_coord.z + 0.25);
+                let name = format!("tree").to_string();
+                vec![Command::Draw{name, drawing: Box::new(Billboard::new(world_coord, 0.5, 0.5, self.tree_texture.clone()))}]
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         }
@@ -209,7 +211,9 @@ impl EventHandler for TerrainHandler {
             out.append(
                 &mut match *event {
                     Event::Start => self.draw_terrain(),
-                    Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![self.select_cell()]},
+                    Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); 
+                        self.draw_tree()
+                    },
                     Event::GlutinEvent(
                         glutin::Event::WindowEvent{
                             event: glutin::WindowEvent::KeyboardInput{
@@ -284,19 +288,19 @@ impl EventHandler for TerrainHandler {
                     ) => {if let Some(world_coord) = self.world_coord {
                         self.label_editor = Some(LabelEditor::new(world_coord, &self.heights)); 
                     }; vec![]},
-                    Event::GlutinEvent(
-                       glutin::Event::WindowEvent{
-                            event: glutin::WindowEvent::KeyboardInput{
-                                input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(glutin::VirtualKeyCode::T), 
-                                    state: glutin::ElementState::Pressed,
-                                    ..
-                                },
-                            ..
-                            },
-                        ..
-                        }
-                    ) => self.draw_tree(),
+                    // Event::GlutinEvent(
+                    //    glutin::Event::WindowEvent{
+                    //         event: glutin::WindowEvent::KeyboardInput{
+                    //             input: glutin::KeyboardInput{
+                    //                 virtual_keycode: Some(glutin::VirtualKeyCode::T), 
+                    //                 state: glutin::ElementState::Pressed,
+                    //                 ..
+                    //             },
+                    //         ..
+                    //         },
+                    //     ..
+                    //     }
+                    // ) => self.draw_tree(),
                     _ => vec![],
                 }
             );
