@@ -8,7 +8,7 @@ use isometric::{Command, Event, IsometricEngine};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
-use isometric::{M, V3, v3};
+use isometric::{M, V3, v2, v3};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
@@ -42,13 +42,13 @@ fn main() {
     }
 
     let sea_level = 0.5;
-    let before_sea_level = Scale::new((0.0, 64.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
+    let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
     let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
 
-    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 64.0)));
+    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
     let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 64.0);
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0);
     engine.add_event_handler(Box::new(TerrainHandler::new(terrain, junctions, rivers, sea_level as f32)));
     
     engine.run();
@@ -57,6 +57,7 @@ fn main() {
 
 pub struct TerrainHandler {
     heights: na::DMatrix<f32>,
+    nodes: Vec<Node>,
     river_nodes: Vec<Node>,
     rivers: Vec<Edge>,
     road_nodes: Vec<Node>,
@@ -67,18 +68,25 @@ pub struct TerrainHandler {
     font: Arc<Font>,
     label_editor: Option<LabelEditor>,
     event_handlers: Vec<Box<EventHandler>>,
-    text_commands: Vec<Command>,
     tree_texture: Arc<Texture>,
 }
 
 impl TerrainHandler {
     pub fn new(heights: na::DMatrix<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> TerrainHandler {
+        
+        let mut nodes = vec![];
+        for x in 0..heights.shape().0 {
+            for y in 0..heights.shape().1 {
+                nodes.push(Node::new(v2(x, y), 0.05, 0.05));
+            }
+        }
 
         TerrainHandler{
             sea_level,
             world_coord: None,
-            terrain: TerrainHandler::compute_terrain(&heights, &river_nodes, &rivers, &vec![], &vec![]),
+            terrain: TerrainHandler::compute_terrain(&heights, &nodes, &rivers, &vec![]),
             heights,
+            nodes,
             river_nodes,
             rivers,
             road_nodes: vec![],
@@ -89,7 +97,6 @@ impl TerrainHandler {
                 Box::new(RotateHandler::new()),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            text_commands: vec![],
             tree_texture: Arc::new(Texture::new(image::open("tree.png").unwrap())),
         }
     }
@@ -110,14 +117,10 @@ impl TerrainHandler {
 
     fn compute_terrain(
         heights: &na::DMatrix<f32>, 
-        river_nodes: &Vec<Node>, 
+        nodes: &Vec<Node>, 
         rivers: &Vec<Edge>,
-        road_nodes: &Vec<Node>, 
         roads: &Vec<Edge>,
     ) -> Terrain {
-        let mut nodes = vec![];
-        nodes.extend(river_nodes.iter().cloned());
-        nodes.extend(road_nodes.iter().cloned());
         let mut edges = vec![];
         edges.extend(rivers.iter().cloned());
         edges.extend(roads.iter().cloned());
@@ -125,7 +128,7 @@ impl TerrainHandler {
     }
     
     fn draw_terrain(&mut self) -> Vec<Command> {
-        self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
+        self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.nodes, &self.rivers, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
     
@@ -166,6 +169,7 @@ impl TerrainHandler {
             let x = world_coord.x.floor();
             let y = world_coord.y.floor();
             let z = self.heights[(x as usize, y as usize)] + 0.25;
+            let world_coord = WorldCoord::new(x, y, z);
             let name = format!("tree@{:?}", world_coord).to_string();
             vec![Command::Draw{name, drawing: Box::new(Billboard::new(world_coord, 0.5, 0.5, self.tree_texture.clone()))}]
         } else {
