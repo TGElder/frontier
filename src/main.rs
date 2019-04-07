@@ -68,6 +68,7 @@ pub struct TerrainHandler {
     label_editor: Option<LabelEditor>,
     event_handlers: Vec<Box<EventHandler>>,
     text_commands: Vec<Command>,
+    tree_texture: Arc<Texture>,
 }
 
 impl TerrainHandler {
@@ -88,7 +89,8 @@ impl TerrainHandler {
                 Box::new(RotateHandler::new()),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            text_commands: vec![]
+            text_commands: vec![],
+            tree_texture: Arc::new(Texture::new(image::open("tree.png").unwrap())),
         }
     }
 }
@@ -156,6 +158,19 @@ impl TerrainHandler {
             }
         }
         Box::new(TerrainDrawing::from_matrix(&self.terrain, &colors, &shading))
+    }
+
+
+    fn draw_tree(&self) -> Vec<Command> {
+        if let Some(world_coord) = self.world_coord {
+            let x = world_coord.x.floor();
+            let y = world_coord.y.floor();
+            let z = self.heights[(x as usize, y as usize)] + 0.25;
+            let name = format!("tree@{:?}", world_coord).to_string();
+            vec![Command::Draw{name, drawing: Box::new(Billboard::new(world_coord, 0.5, 0.5, self.tree_texture.clone()))}]
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -269,6 +284,19 @@ impl EventHandler for TerrainHandler {
                     ) => {if let Some(world_coord) = self.world_coord {
                         self.label_editor = Some(LabelEditor::new(world_coord, &self.heights)); 
                     }; vec![]},
+                    Event::GlutinEvent(
+                       glutin::Event::WindowEvent{
+                            event: glutin::WindowEvent::KeyboardInput{
+                                input: glutin::KeyboardInput{
+                                    virtual_keycode: Some(glutin::VirtualKeyCode::T), 
+                                    state: glutin::ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                            },
+                        ..
+                        }
+                    ) => self.draw_tree(),
                     _ => vec![],
                 }
             );
@@ -276,6 +304,7 @@ impl EventHandler for TerrainHandler {
         }
 
     }
+
 
 }
 
