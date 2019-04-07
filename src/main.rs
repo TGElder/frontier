@@ -160,7 +160,7 @@ impl TerrainHandler {
                 }
             }
         }
-        Box::new(TerrainDrawing::from_matrix(&self.terrain, &colors, &shading))
+        Box::new(TerrainDrawing::uniform(&self.terrain, shading))
     }
 
 
