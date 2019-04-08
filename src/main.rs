@@ -12,6 +12,7 @@ use isometric::{M, V3, v3};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
+use isometric::Direction;
 
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;
@@ -141,9 +142,11 @@ impl TerrainHandler {
         let width = (self.heights.shape().0) - 1;
         let height = (self.heights.shape().1) - 1;
         let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
-        let green = Color::new(0.0, 0.75, 0.0, 1.0);
-        let grey = Color::new(0.5, 0.4, 0.3, 1.0);
-        let mut colors: M<Color> = M::from_element(width, height, green);
+        let grass = Color::new(0.0, 0.75, 0.0, 1.0);
+        let rock = Color::new(0.5, 0.4, 0.3, 1.0);
+        let beach = Color::new(1.0, 1.0, 0.0, 1.0);
+        let beach_level = self.sea_level + 0.1;
+        let mut colors: M<Color> = M::from_element(width, height, grass);
         for x in 0..self.heights.shape().0 - 1 {
             for y in 0..self.heights.shape().1 - 1 {
                 if (self.heights[(x, y)] - self.heights[(x + 1, y)]).abs() > 0.533333333 
@@ -151,8 +154,16 @@ impl TerrainHandler {
                 || (self.heights[(x + 1, y + 1)]- self.heights[(x, y + 1)]).abs() > 0.533333333 
                 || (self.heights[(x, y + 1)]- self.heights[(x, y)]).abs() > 0.533333333    
                 {
-                    colors[(x, y)] = grey;
+                    colors[(x, y)] = rock;
+                } else if 
+                    self.heights[(x, y)] < beach_level &&
+                    self.heights[(x + 1, y)] < beach_level &&
+                    self.heights[(x + 1, y + 1)] < beach_level &&
+                    self.heights[(x, y + 1)] < beach_level 
+                {
+                    colors[(x, y)] = beach;
                 }
+                
             }
         }
         Box::new(TerrainDrawing::from_matrix(&self.terrain, &colors, &shading))
@@ -195,7 +206,7 @@ impl EventHandler for TerrainHandler {
             out.append(
                 &mut match *event {
                     Event::Start => self.draw_terrain(),
-                    Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![self.select_cell()]},
+                    Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![]},//self.select_cell()]},
                     Event::GlutinEvent(
                         glutin::Event::WindowEvent{
                             event: glutin::WindowEvent::KeyboardInput{
@@ -276,6 +287,10 @@ impl EventHandler for TerrainHandler {
                                 input: glutin::KeyboardInput{
                                     virtual_keycode: Some(key), 
                                     state: glutin::ElementState::Pressed,
+                                    modifiers: glutin::ModifiersState{
+                                        shift: false,
+                                        ..
+                                    },
                                     ..
                                 },
                             ..
@@ -283,12 +298,30 @@ impl EventHandler for TerrainHandler {
                         ..
                         }
                     ) => match key {
-                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.draw()},
-                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw(true)},
+                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw(true)},
+                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw(true)},
+                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw(true)},
+                        glutin::VirtualKeyCode::Space => {self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw(false)},
                         _ => vec![],
                     },
+                    Event::GlutinEvent(
+                       glutin::Event::WindowEvent{
+                            event: glutin::WindowEvent::KeyboardInput{
+                                input: glutin::KeyboardInput{
+                                    virtual_keycode: Some(glutin::VirtualKeyCode::Space), 
+                                    state: glutin::ElementState::Pressed,
+                                    modifiers: glutin::ModifiersState{
+                                        shift: true,
+                                        ..
+                                    },
+                                    ..
+                                },
+                            ..
+                            },
+                        ..
+                        }
+                    ) => {self.avatar.rotate_sprite_clockwise(); self.avatar.draw(false)},
                     _ => vec![],
                 }
             );
@@ -347,7 +380,7 @@ impl Rotation {
 
 struct Avatar {
     rotation: Rotation,
-    world_rotation: Rotation,
+    sprite_rotation: Rotation,
     position: Option<WorldCoord>,
     texture_front: Arc<Texture>,
     texture_back: Arc<Texture>,
@@ -358,7 +391,7 @@ impl Avatar {
     pub fn new() -> Avatar {
         Avatar{
             rotation: Rotation::Down,
-            world_rotation: Rotation::Down,
+            sprite_rotation: Rotation::Down,
             position: None,
             texture_front: Arc::new(Texture::new(image::open("link_front.png").unwrap())),
             texture_back: Arc::new(Texture::new(image::open("link_back.png").unwrap())),
@@ -371,6 +404,14 @@ impl Avatar {
 
     fn rotate_anticlockwise(&mut self) {
         self.rotation = self.rotation.anticlockwise();
+    }
+
+    fn rotate_sprite_clockwise(&mut self) {
+        self.sprite_rotation = self.sprite_rotation.clockwise();
+    }
+
+    fn rotate_sprite_anticlockwise(&mut self) {
+        self.sprite_rotation = self.sprite_rotation.anticlockwise();
     }
 
     fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
@@ -394,20 +435,27 @@ impl Avatar {
                 Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
                 Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
             };
-            self.position = Some(Avatar::snap(new_position, heights));
+            let new_position = Avatar::snap(new_position, heights);
+            if (new_position.z - position.z).abs() < 0.533333333 {
+                self.position = Some(new_position);
+            }
         }
     }
 
-    fn draw(&self) -> Vec<Command> {
+    fn draw(&self, look_at: bool) -> Vec<Command> {
         const NAME: &str = "avatar";
         if let Some(position) = self.position {
-            let command = match self.rotation {
+            let command = match self.sprite_rotation {
                 Rotation::Left => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_front.clone()))},
                 Rotation::Up => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_front.clone()))},
                 Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_back.clone()))},
                 Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_back.clone()))},
             };
-            vec![command]
+            if look_at {
+                vec![command, Command::LookAt(position)]
+            } else {
+                vec![command]
+            }
         } else {
             vec![]
         }
