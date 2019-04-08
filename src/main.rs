@@ -67,8 +67,7 @@ pub struct TerrainHandler {
     font: Arc<Font>,
     label_editor: Option<LabelEditor>,
     event_handlers: Vec<Box<EventHandler>>,
-    text_commands: Vec<Command>,
-    tree_texture: Arc<Texture>,
+    avatar: Avatar,
 }
 
 impl TerrainHandler {
@@ -89,8 +88,7 @@ impl TerrainHandler {
                 Box::new(RotateHandler::new()),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            text_commands: vec![],
-            tree_texture: Arc::new(Texture::new(image::open("tree.png").unwrap())),
+            avatar: Avatar::new(),
         }
     }
 }
@@ -160,18 +158,6 @@ impl TerrainHandler {
         Box::new(TerrainDrawing::from_matrix(&self.terrain, &colors, &shading))
     }
 
-
-    fn draw_tree(&self) -> Vec<Command> {
-        if let Some(world_coord) = self.world_coord {
-            let x = world_coord.x.floor();
-            let y = world_coord.y.floor();
-            let z = self.heights[(x as usize, y as usize)] + 0.25;
-            let name = format!("tree@{:?}", world_coord).to_string();
-            vec![Command::Draw{name, drawing: Box::new(Billboard::new(world_coord, 0.5, 0.5, self.tree_texture.clone()))}]
-        } else {
-            vec![]
-        }
-    }
 }
 
 impl EventHandler for TerrainHandler {
@@ -288,7 +274,7 @@ impl EventHandler for TerrainHandler {
                        glutin::Event::WindowEvent{
                             event: glutin::WindowEvent::KeyboardInput{
                                 input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(glutin::VirtualKeyCode::T), 
+                                    virtual_keycode: Some(key), 
                                     state: glutin::ElementState::Pressed,
                                     ..
                                 },
@@ -296,7 +282,13 @@ impl EventHandler for TerrainHandler {
                             },
                         ..
                         }
-                    ) => self.draw_tree(),
+                    ) => match key {
+                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
+                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
+                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.draw()},
+                        _ => vec![],
+                    },
                     _ => vec![],
                 }
             );
@@ -323,5 +315,101 @@ impl LabelEditor {
         let world_coord = WorldCoord::new(x, y, z);
 
         LabelEditor{world_coord, text_editor: TextEditor::new()}
+    }
+}
+
+enum Rotation {
+    Left,
+    Up,
+    Right,
+    Down
+}
+
+impl Rotation {
+    fn clockwise(&self) -> Rotation {
+        match self {
+            Rotation::Left => Rotation::Up,
+            Rotation::Up => Rotation::Right,
+            Rotation::Right => Rotation::Down,
+            Rotation::Down => Rotation::Left,
+        }
+    }
+
+    fn anticlockwise(&self) -> Rotation {
+        match self {
+            Rotation::Left => Rotation::Down,
+            Rotation::Up => Rotation::Left,
+            Rotation::Right => Rotation::Up,
+            Rotation::Down => Rotation::Right,
+        }
+    }
+}
+
+struct Avatar {
+    rotation: Rotation,
+    world_rotation: Rotation,
+    position: Option<WorldCoord>,
+    texture_front: Arc<Texture>,
+    texture_back: Arc<Texture>,
+}
+
+impl Avatar {
+
+    pub fn new() -> Avatar {
+        Avatar{
+            rotation: Rotation::Down,
+            world_rotation: Rotation::Down,
+            position: None,
+            texture_front: Arc::new(Texture::new(image::open("link_front.png").unwrap())),
+            texture_back: Arc::new(Texture::new(image::open("link_back.png").unwrap())),
+        }
+    }
+
+    fn rotate_clockwise(&mut self) {
+        self.rotation = self.rotation.clockwise();
+    }
+
+    fn rotate_anticlockwise(&mut self) {
+        self.rotation = self.rotation.anticlockwise();
+    }
+
+    fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
+        if let Some(world_coord) = world_coord {
+            self.position = Some(Avatar::snap(world_coord, heights));
+        }
+    }
+
+    fn snap(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> WorldCoord {
+        let x = world_coord.x.floor();
+        let y = world_coord.y.floor();
+        let z = heights[(x as usize, y as usize)] + 0.375;
+        WorldCoord::new(x, y, z)
+    }
+
+    fn walk(&mut self, heights: &na::DMatrix<f32>) {
+        if let Some(position) = self.position {
+            let new_position = match self.rotation {
+                Rotation::Left => WorldCoord::new(position.x + 1.0, position.y, 0.0),
+                Rotation::Up => WorldCoord::new(position.x, position.y + 1.0, 0.0),
+                Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
+                Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
+            };
+            self.position = Some(Avatar::snap(new_position, heights));
+        }
+    }
+
+    fn draw(&self) -> Vec<Command> {
+        const NAME: &str = "avatar";
+        if let Some(position) = self.position {
+            let command = match self.rotation {
+                Rotation::Left => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_front.clone()))},
+                Rotation::Up => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_front.clone()))},
+                Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_back.clone()))},
+                Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_back.clone()))},
+            };
+            vec![command]
+        } else {
+            vec![]
+        }
     }
 }
