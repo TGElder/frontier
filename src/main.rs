@@ -4,7 +4,7 @@ extern crate image;
 use isometric::events::EventHandler;
 use isometric::event_handlers::*;
 use isometric::Color;
-use isometric::{Command, Event, IsometricEngine};
+use isometric::{Command, Event, IsometricEngine, CenterOfRotation};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
@@ -30,26 +30,26 @@ fn main() {
 
     let mut mesh = Mesh::new(1, 0.0);
     mesh.set_z(0, 0, MAX);
-    let seed = 181;
+    let seed = 181; //181 is a good seed, also 182
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
     for i in 0..9 {
         mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
         if i < 9 {
             let threshold = i * 2;
-            mesh = Erosion::erode(mesh, &mut rng, threshold, 8);
+            mesh = Erosion::erode(mesh, &mut rng, threshold, 16);
         }
         println!("{}-{}", i, mesh.get_width());
     }
 
     let sea_level = 0.5;
-    let before_sea_level = Scale::new((0.0, 64.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
+    let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
     let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
 
-    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 64.0)));
+    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
     let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 64.0);
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0);
     engine.add_event_handler(Box::new(TerrainHandler::new(terrain, junctions, rivers, sea_level as f32)));
     
     engine.run();
@@ -145,7 +145,7 @@ impl TerrainHandler {
         let grass = Color::new(0.0, 0.75, 0.0, 1.0);
         let rock = Color::new(0.5, 0.4, 0.3, 1.0);
         let beach = Color::new(1.0, 1.0, 0.0, 1.0);
-        let beach_level = self.sea_level + 0.1;
+        let beach_level = self.sea_level + 0.05;
         let mut colors: M<Color> = M::from_element(width, height, grass);
         for x in 0..self.heights.shape().0 - 1 {
             for y in 0..self.heights.shape().1 - 1 {
@@ -298,11 +298,11 @@ impl EventHandler for TerrainHandler {
                         ..
                         }
                     ) => match key {
-                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw(true)},
-                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw(true)},
-                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw(true)},
-                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw(true)},
-                        glutin::VirtualKeyCode::Space => {self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw(false)},
+                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
+                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
+                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::Space => {self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
                         _ => vec![],
                     },
                     Event::GlutinEvent(
@@ -321,7 +321,14 @@ impl EventHandler for TerrainHandler {
                             },
                         ..
                         }
-                    ) => {self.avatar.rotate_sprite_clockwise(); self.avatar.draw(false)},
+                    ) => {self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
+                    Event::WorldDrawn => {
+                        if let Some(position) = self.avatar.position {
+                            vec![Command::LookAt(position)]
+                        } else {
+                            vec![]
+                        }
+                    }
                     _ => vec![],
                 }
             );
@@ -414,6 +421,19 @@ impl Avatar {
         self.sprite_rotation = self.sprite_rotation.anticlockwise();
     }
 
+    // fn rotate_screen_clockwise(&mut self) -> Vec<Command> {
+    //     if let Some(position) = self.position {
+    //         self.rotate_sprite_anticlockwise();
+
+    //         let out = self.draw(true);
+    //         out.push(Command::Rotate{center: CenterOfRotation::WorldCoord(self.position), direction: Direction::Clockwise});
+    //         out
+    //     } else {
+    //         vec![]
+    //     }
+        
+    // }
+
     fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
         if let Some(world_coord) = world_coord {
             self.position = Some(Avatar::snap(world_coord, heights));
@@ -442,7 +462,7 @@ impl Avatar {
         }
     }
 
-    fn draw(&self, look_at: bool) -> Vec<Command> {
+    fn draw(&self) -> Vec<Command> {
         const NAME: &str = "avatar";
         if let Some(position) = self.position {
             let command = match self.sprite_rotation {
@@ -451,11 +471,7 @@ impl Avatar {
                 Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_back.clone()))},
                 Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_back.clone()))},
             };
-            if look_at {
-                vec![command, Command::LookAt(position)]
-            } else {
-                vec![command]
-            }
+            vec![command]
         } else {
             vec![]
         }
