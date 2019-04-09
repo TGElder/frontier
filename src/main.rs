@@ -360,27 +360,39 @@ impl LabelEditor {
 
 enum Rotation {
     Left,
+    UpLeft,
     Up,
+    UpRight,
     Right,
-    Down
+    DownRight,
+    Down,
+    DownLeft,
 }
 
 impl Rotation {
     fn clockwise(&self) -> Rotation {
         match self {
-            Rotation::Left => Rotation::Up,
-            Rotation::Up => Rotation::Right,
-            Rotation::Right => Rotation::Down,
-            Rotation::Down => Rotation::Left,
+            Rotation::Left => Rotation::UpLeft,
+            Rotation::UpLeft => Rotation::Up,
+            Rotation::Up => Rotation::UpRight,
+            Rotation::UpRight => Rotation::Right,
+            Rotation::Right => Rotation::DownRight,
+            Rotation::DownRight => Rotation::Down,
+            Rotation::Down => Rotation::DownLeft,
+            Rotation::DownLeft => Rotation::Left,
         }
     }
 
     fn anticlockwise(&self) -> Rotation {
         match self {
-            Rotation::Left => Rotation::Down,
-            Rotation::Up => Rotation::Left,
-            Rotation::Right => Rotation::Up,
-            Rotation::Down => Rotation::Right,
+            Rotation::Left => Rotation::DownLeft,
+            Rotation::UpLeft => Rotation::Left,
+            Rotation::Up => Rotation::UpLeft,
+            Rotation::UpRight => Rotation::Up,
+            Rotation::Right => Rotation::UpRight,
+            Rotation::DownRight => Rotation::Right,
+            Rotation::Down => Rotation::DownRight,
+            Rotation::DownLeft => Rotation::Down,
         }
     }
 }
@@ -391,6 +403,9 @@ struct Avatar {
     position: Option<WorldCoord>,
     texture_front: Arc<Texture>,
     texture_back: Arc<Texture>,
+    texture_up: Arc<Texture>,
+    texture_down: Arc<Texture>,
+    texture_side: Arc<Texture>,
 }
 
 impl Avatar {
@@ -402,6 +417,9 @@ impl Avatar {
             position: None,
             texture_front: Arc::new(Texture::new(image::open("link_front.png").unwrap())),
             texture_back: Arc::new(Texture::new(image::open("link_back.png").unwrap())),
+            texture_up: Arc::new(Texture::new(image::open("link_up.png").unwrap())),
+            texture_down: Arc::new(Texture::new(image::open("link_down.png").unwrap())),
+            texture_side: Arc::new(Texture::new(image::open("link_side.png").unwrap())),
         }
     }
 
@@ -441,6 +459,7 @@ impl Avatar {
                 Rotation::Up => WorldCoord::new(position.x, position.y + 1.0, 0.0),
                 Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
                 Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
+                _ => position,
             };
             let new_position = Avatar::snap(new_position, heights);
             if (new_position.z - position.z).abs() < 0.533333333 {
@@ -454,9 +473,13 @@ impl Avatar {
         if let Some(position) = self.position {
             let command = match self.sprite_rotation {
                 Rotation::Left => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_front.clone()))},
+                Rotation::UpLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_down.clone()))},
                 Rotation::Up => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_front.clone()))},
+                Rotation::UpRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_side.clone()))},
                 Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_back.clone()))},
+                Rotation::DownRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_up.clone()))},
                 Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_back.clone()))},
+                Rotation::DownLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_side.clone()))},
             };
             vec![command]
         } else {
