@@ -4,7 +4,7 @@ extern crate image;
 use isometric::events::EventHandler;
 use isometric::event_handlers::*;
 use isometric::Color;
-use isometric::{Command, Event, IsometricEngine, CenterOfRotation};
+use isometric::{Command, Event, IsometricEngine};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
@@ -420,19 +420,6 @@ impl Avatar {
     fn rotate_sprite_anticlockwise(&mut self) {
         self.sprite_rotation = self.sprite_rotation.anticlockwise();
     }
-
-    // fn rotate_screen_clockwise(&mut self) -> Vec<Command> {
-    //     if let Some(position) = self.position {
-    //         self.rotate_sprite_anticlockwise();
-
-    //         let out = self.draw(true);
-    //         out.push(Command::Rotate{center: CenterOfRotation::WorldCoord(self.position), direction: Direction::Clockwise});
-    //         out
-    //     } else {
-    //         vec![]
-    //     }
-        
-    // }
 
     fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
         if let Some(world_coord) = world_coord {
