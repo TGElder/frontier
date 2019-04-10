@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 extern crate image;
 
-use isometric::events::EventHandler;
+use isometric::EventHandler;
 use isometric::event_handlers::*;
 use isometric::Color;
 use isometric::{Command, Event, IsometricEngine};
@@ -13,6 +13,7 @@ use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
 use isometric::Direction;
+use isometric::VirtualKeyCode;
 
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;
@@ -25,6 +26,9 @@ use pioneer::rand::prelude::*;
 use isometric::glutin;
 
 use std::sync::Arc;
+
+mod house_builder;
+use house_builder::HouseBuilder;
 
 fn main() {
 
@@ -86,7 +90,7 @@ impl TerrainHandler {
             font: Arc::new(Font::from_csv_and_texture("serif.csv", Texture::new(image::open("serif.png").unwrap()))),
             label_editor: None,
             event_handlers: vec![
-                Box::new(RotateHandler::new()),
+                Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
             avatar: Avatar::new(),
@@ -300,8 +304,18 @@ impl EventHandler for TerrainHandler {
                     ) => match key {
                         glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
                         glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
-                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::A => {
+                            self.avatar.rotate_anticlockwise();
+                            let mut commands = self.avatar.draw();
+                            commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise});
+                            commands
+                        },
+                        glutin::VirtualKeyCode::D => {
+                            self.avatar.rotate_clockwise();
+                            let mut commands = self.avatar.draw();
+                            commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise});
+                            commands
+                        },
                         glutin::VirtualKeyCode::Space => {self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
                         _ => vec![],
                     },
@@ -412,8 +426,8 @@ impl Avatar {
 
     pub fn new() -> Avatar {
         Avatar{
-            rotation: Rotation::Down,
-            sprite_rotation: Rotation::Down,
+            rotation: Rotation::Up,
+            sprite_rotation: Rotation::DownRight,
             position: None,
             texture_front: Arc::new(Texture::new(image::open("link_front.png").unwrap())),
             texture_back: Arc::new(Texture::new(image::open("link_back.png").unwrap())),
