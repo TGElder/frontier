@@ -8,7 +8,7 @@ use isometric::{Command, Event, IsometricEngine};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
-use isometric::{M, V3, v3};
+use isometric::{M, v2};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
@@ -224,45 +224,38 @@ impl EventHandler for TerrainHandler {
                         ..
                         }
                     ) => {
-                        if let Some(world_coord) = self.world_coord {
-                            let cell_x = world_coord.x.floor();
-                            let cell_y = world_coord.y.floor();
-                            let distance_to_left = world_coord.x - cell_x;
-                            let distance_to_right = (cell_x + 1.0) - world_coord.x;
-                            let distance_to_bottom = world_coord.y - cell_y;
-                            let distance_to_top = (cell_y + 1.0) - world_coord.y; 
-                            let min = distance_to_left.min(distance_to_right).min(distance_to_top).min(distance_to_bottom);
-                            let (from, to) = match min {
-                                d if d == distance_to_left => (na::Vector2::new(cell_x as usize, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize)),
-                                d if d == distance_to_right => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize + 1, cell_y as usize)),
-                                d if d == distance_to_bottom => (na::Vector2::new(cell_x as usize + 1, cell_y as usize), na::Vector2::new(cell_x as usize, cell_y as usize)),
-                                d if d == distance_to_top => (na::Vector2::new(cell_x as usize + 1, cell_y as usize + 1), na::Vector2::new(cell_x as usize, cell_y as usize + 1)),
-                                _ => panic!("Should not happen: minimum of four values does not match any of those values"),
-                            };
-                            let from_z = self.heights[(from.x, from.y)];
-                            let to_z = self.heights[(to.x, to.y)];
-                            let rise = if from_z > to_z {from_z - to_z} else{to_z - from_z};
-                            if rise * 187.5 < 100.0 {
-                                
-                                let edge = Edge::new(from, to);
-                                if !self.roads.contains(&edge) {
-                                    self.roads.push(edge);
-                                } else {
-                                    let index = self.roads.iter().position(|other| *other == edge).unwrap();
-                                    self.roads.remove(index);
-                                }
-                                self.road_nodes = vec![];
-                                for edge in self.roads.iter() {
-                                    if !edge.horizontal() {
-                                        self.road_nodes.push(Node::new(*edge.from(), 0.05, 0.0));
-                                        self.road_nodes.push(Node::new(*edge.to(), 0.05, 0.0));
+                        if let Some(from) = self.avatar.position {
+                            self.avatar.walk(&self.heights);
+                            if let Some(to) = self.avatar.position {
+                                if from != to {
+
+                                    let from = v2(from.x as usize, from.y as usize);
+                                    let to = v2(to.x as usize, to.y as usize);
+                                   
+                                    let edge = Edge::new(from, to);
+                                    if !self.roads.contains(&edge) {
+                                        self.roads.push(edge);
                                     } else {
-                                        self.road_nodes.push(Node::new(*edge.from(), 0.0, 0.05));
-                                        self.road_nodes.push(Node::new(*edge.to(), 0.0, 0.05));
+                                        let index = self.roads.iter().position(|other| *other == edge).unwrap();
+                                        self.roads.remove(index);
                                     }
+                                    self.road_nodes = vec![];
+                                    for edge in self.roads.iter() {
+                                        if !edge.horizontal() {
+                                            self.road_nodes.push(Node::new(*edge.from(), 0.05, 0.0));
+                                            self.road_nodes.push(Node::new(*edge.to(), 0.05, 0.0));
+                                        } else {
+                                            self.road_nodes.push(Node::new(*edge.from(), 0.0, 0.05));
+                                            self.road_nodes.push(Node::new(*edge.to(), 0.0, 0.05));
+                                        }
+                                    }
+                                    let mut commands = vec![];
+                                    commands.append(&mut self.draw_terrain());
+                                    commands.append(&mut self.avatar.draw());
+                                    commands
+                                } else {
+                                    vec![]
                                 }
-                                
-                                self.draw_terrain()
                             } else {
                                 vec![]
                             }
@@ -304,8 +297,18 @@ impl EventHandler for TerrainHandler {
                     ) => match key {
                         glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
                         glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
-                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::A => {
+                            self.avatar.rotate_anticlockwise(); 
+                            self.avatar.rotate_anticlockwise(); 
+                            self.avatar.rotate_sprite_anticlockwise();
+                            self.avatar.rotate_sprite_anticlockwise();
+                            self.avatar.draw()},
+                        glutin::VirtualKeyCode::D => {
+                            self.avatar.rotate_clockwise();
+                            self.avatar.rotate_clockwise();
+                            self.avatar.rotate_sprite_clockwise();
+                            self.avatar.rotate_sprite_clockwise();
+                            self.avatar.draw()},
                         glutin::VirtualKeyCode::Q => {
                             self.avatar.rotate_sprite_clockwise();
                             let mut commands = self.avatar.draw();
@@ -446,7 +449,7 @@ impl Avatar {
     fn snap(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> WorldCoord {
         let x = world_coord.x.floor();
         let y = world_coord.y.floor();
-        let z = heights[(x as usize, y as usize)] + 0.375;
+        let z = heights[(x as usize, y as usize)] + 0.1875;
         WorldCoord::new(x, y, z)
     }
 
@@ -470,14 +473,14 @@ impl Avatar {
         const NAME: &str = "avatar";
         if let Some(position) = self.position {
             let command = match self.sprite_rotation {
-                Rotation::Left => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_front.clone()))},
-                Rotation::UpLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_down.clone()))},
-                Rotation::Up => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_front.clone()))},
-                Rotation::UpRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_side.clone()))},
-                Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.5, 0.75, self.texture_back.clone()))},
-                Rotation::DownRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_up.clone()))},
-                Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_back.clone()))},
-                Rotation::DownLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.5, 0.75, self.texture_side.clone()))},
+                Rotation::Left => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_front.clone()))},
+                Rotation::UpLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_down.clone()))},
+                Rotation::Up => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.25, 0.375, self.texture_front.clone()))},
+                Rotation::UpRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.25, 0.375, self.texture_side.clone()))},
+                Rotation::Right => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, -0.25, 0.375, self.texture_back.clone()))},
+                Rotation::DownRight => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_up.clone()))},
+                Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_back.clone()))},
+                Rotation::DownLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_side.clone()))},
             };
             vec![command]
         } else {
