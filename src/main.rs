@@ -90,7 +90,7 @@ impl TerrainHandler {
             font: Arc::new(Font::from_csv_and_texture("serif.csv", Texture::new(image::open("serif.png").unwrap()))),
             label_editor: None,
             event_handlers: vec![
-                Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
+                // Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
             avatar: Avatar::new(),
@@ -304,38 +304,22 @@ impl EventHandler for TerrainHandler {
                     ) => match key {
                         glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
                         glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::A => {
-                            self.avatar.rotate_anticlockwise();
+                        glutin::VirtualKeyCode::A => {self.avatar.rotate_anticlockwise(); self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::D => {self.avatar.rotate_clockwise(); self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
+                        glutin::VirtualKeyCode::Q => {
+                            self.avatar.rotate_sprite_clockwise();
                             let mut commands = self.avatar.draw();
                             commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise});
                             commands
                         },
-                        glutin::VirtualKeyCode::D => {
-                            self.avatar.rotate_clockwise();
+                        glutin::VirtualKeyCode::E => {
+                            self.avatar.rotate_sprite_anticlockwise();
                             let mut commands = self.avatar.draw();
                             commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise});
                             commands
                         },
-                        glutin::VirtualKeyCode::Space => {self.avatar.rotate_sprite_anticlockwise(); self.avatar.draw()},
                         _ => vec![],
                     },
-                    Event::GlutinEvent(
-                       glutin::Event::WindowEvent{
-                            event: glutin::WindowEvent::KeyboardInput{
-                                input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(glutin::VirtualKeyCode::Space), 
-                                    state: glutin::ElementState::Pressed,
-                                    modifiers: glutin::ModifiersState{
-                                        shift: true,
-                                        ..
-                                    },
-                                    ..
-                                },
-                            ..
-                            },
-                        ..
-                        }
-                    ) => {self.avatar.rotate_sprite_clockwise(); self.avatar.draw()},
                     Event::WorldDrawn => {
                         if let Some(position) = self.avatar.position {
                             vec![Command::LookAt(position)]
