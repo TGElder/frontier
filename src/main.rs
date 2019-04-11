@@ -13,7 +13,7 @@ use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
 use isometric::Direction;
-use isometric::VirtualKeyCode;
+use isometric::{VirtualKeyCode, ElementState};
 
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;
@@ -23,7 +23,6 @@ use std::f64::MAX;
 use pioneer::river_runner::get_junctions_and_rivers;
 
 use pioneer::rand::prelude::*;
-use isometric::glutin;
 
 use std::sync::Arc;
 
@@ -181,19 +180,7 @@ impl EventHandler for TerrainHandler {
 
         if let Some(label_editor) = &mut self.label_editor {
             match *event {
-                Event::GlutinEvent(
-                    glutin::Event::WindowEvent{
-                        event: glutin::WindowEvent::KeyboardInput{
-                            input: glutin::KeyboardInput{
-                                virtual_keycode: Some(glutin::VirtualKeyCode::Return), 
-                                state: glutin::ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                        },
-                    ..
-                    }
-                ) => {self.label_editor = None; vec![]},
+                Event::Key{key: VirtualKeyCode::Return, state: ElementState::Pressed, ..} => {self.label_editor = None; vec![]},
                 _ => {
                     label_editor.text_editor.handle_event(event.clone());
                     let position = label_editor.world_coord;
@@ -211,19 +198,7 @@ impl EventHandler for TerrainHandler {
                 &mut match *event {
                     Event::Start => self.draw_terrain(),
                     Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![]},//self.select_cell()]},
-                    Event::GlutinEvent(
-                        glutin::Event::WindowEvent{
-                            event: glutin::WindowEvent::KeyboardInput{
-                                input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(glutin::VirtualKeyCode::R), 
-                                    state: glutin::ElementState::Pressed,
-                                    ..
-                                },
-                            ..
-                            },
-                        ..
-                        }
-                    ) => {
+                    Event::Key{key: VirtualKeyCode::R, state: ElementState::Pressed, ..} => {
                         if let Some(from) = self.avatar.position {
                             self.avatar.walk(&self.heights);
                             if let Some(to) = self.avatar.position {
@@ -263,59 +238,34 @@ impl EventHandler for TerrainHandler {
                             vec![]
                         }
                     },
-                    Event::GlutinEvent(
-                        glutin::Event::WindowEvent{
-                            event: glutin::WindowEvent::KeyboardInput{
-                                input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(glutin::VirtualKeyCode::L), 
-                                    state: glutin::ElementState::Pressed,
-                                    ..
-                                },
-                            ..
-                            },
-                        ..
-                        }
-                    ) => {if let Some(world_coord) = self.world_coord {
-                        self.label_editor = Some(LabelEditor::new(world_coord, &self.heights)); 
-                    }; vec![]},
-                    Event::GlutinEvent(
-                       glutin::Event::WindowEvent{
-                            event: glutin::WindowEvent::KeyboardInput{
-                                input: glutin::KeyboardInput{
-                                    virtual_keycode: Some(key), 
-                                    state: glutin::ElementState::Pressed,
-                                    modifiers: glutin::ModifiersState{
-                                        shift: false,
-                                        ..
-                                    },
-                                    ..
-                                },
-                            ..
-                            },
-                        ..
-                        }
-                    ) => match key {
-                        glutin::VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
-                        glutin::VirtualKeyCode::A => {
+                    Event::Key{key: VirtualKeyCode::L, state: ElementState::Pressed, ..} => {
+                        if let Some(world_coord) = self.world_coord {
+                            self.label_editor = Some(LabelEditor::new(world_coord, &self.heights)); 
+                        };
+                        vec![]
+                    },
+                    Event::Key{key, state: ElementState::Pressed, ..} => match key {
+                        VirtualKeyCode::H => {self.avatar.reposition(self.world_coord, &self.heights); self.avatar.draw()},
+                        VirtualKeyCode::W => {self.avatar.walk(&self.heights); self.avatar.draw()},
+                        VirtualKeyCode::A => {
                             self.avatar.rotate_anticlockwise(); 
                             self.avatar.rotate_anticlockwise(); 
                             self.avatar.rotate_sprite_anticlockwise();
                             self.avatar.rotate_sprite_anticlockwise();
                             self.avatar.draw()},
-                        glutin::VirtualKeyCode::D => {
+                        VirtualKeyCode::D => {
                             self.avatar.rotate_clockwise();
                             self.avatar.rotate_clockwise();
                             self.avatar.rotate_sprite_clockwise();
                             self.avatar.rotate_sprite_clockwise();
                             self.avatar.draw()},
-                        glutin::VirtualKeyCode::Q => {
+                        VirtualKeyCode::Q => {
                             self.avatar.rotate_sprite_clockwise();
                             let mut commands = self.avatar.draw();
                             commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise});
                             commands
                         },
-                        glutin::VirtualKeyCode::E => {
+                        VirtualKeyCode::E => {
                             self.avatar.rotate_sprite_anticlockwise();
                             let mut commands = self.avatar.draw();
                             commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise});
