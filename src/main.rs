@@ -261,25 +261,18 @@ impl EventHandler for TerrainHandler {
                             self.avatar.draw()},
                         VirtualKeyCode::Q => {
                             self.avatar.rotate_sprite_clockwise();
-                            let mut commands = self.avatar.draw();
-                            commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise});
+                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise}];
+                            commands.append(&mut self.avatar.draw());
                             commands
                         },
                         VirtualKeyCode::E => {
                             self.avatar.rotate_sprite_anticlockwise();
-                            let mut commands = self.avatar.draw();
-                            commands.push(Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise});
+                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise}];
+                            commands.append(&mut self.avatar.draw());
                             commands
                         },
                         _ => vec![],
                     },
-                    Event::WorldDrawn => {
-                        if let Some(position) = self.avatar.position {
-                            vec![Command::LookAt(position)]
-                        } else {
-                            vec![]
-                        }
-                    }
                     _ => vec![],
                 }
             );
@@ -432,7 +425,7 @@ impl Avatar {
                 Rotation::Down => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_back.clone()))},
                 Rotation::DownLeft => Command::Draw{name: NAME.to_string(), drawing: Box::new(Billboard::new(position, 0.25, 0.375, self.texture_side.clone()))},
             };
-            vec![command]
+            vec![command, Command::LookAt(position)]
         } else {
             vec![]
         }
