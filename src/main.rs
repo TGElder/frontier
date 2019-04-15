@@ -12,7 +12,7 @@ use isometric::{M, v2};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
-use isometric::Direction;
+use std::f32::consts::PI;
 use isometric::{VirtualKeyCode, ElementState};
 
 use pioneer::mesh::Mesh;
@@ -261,13 +261,13 @@ impl EventHandler for TerrainHandler {
                             self.avatar.draw()},
                         VirtualKeyCode::Q => {
                             self.avatar.rotate_sprite_clockwise();
-                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::Clockwise}];
+                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), yaw: PI / 4.0}];
                             commands.append(&mut self.avatar.draw());
                             commands
                         },
                         VirtualKeyCode::E => {
                             self.avatar.rotate_sprite_anticlockwise();
-                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), direction: Direction::AntiClockwise}];
+                            let mut commands = vec![Command::Rotate{center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0), yaw: -PI / 4.0}];
                             commands.append(&mut self.avatar.draw());
                             commands
                         },
