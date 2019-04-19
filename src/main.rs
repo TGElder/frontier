@@ -80,7 +80,7 @@ impl TerrainHandler {
         TerrainHandler{
             sea_level,
             world_coord: None,
-            terrain: TerrainHandler::compute_terrain(&heights, &river_nodes, &rivers, &vec![], &vec![]),
+            terrain: Terrain::new(heights.clone(), &river_nodes, &rivers),
             heights,
             river_nodes,
             rivers,
@@ -109,25 +109,8 @@ impl TerrainHandler {
             Command::Erase("selected_cell".to_string())
         }
     }
-
-    fn compute_terrain(
-        heights: &na::DMatrix<f32>, 
-        river_nodes: &Vec<Node>, 
-        rivers: &Vec<Edge>,
-        road_nodes: &Vec<Node>, 
-        roads: &Vec<Edge>,
-    ) -> Terrain {
-        let mut nodes = vec![];
-        nodes.extend(river_nodes.iter().cloned());
-        nodes.extend(road_nodes.iter().cloned());
-        let mut edges = vec![];
-        edges.extend(rivers.iter().cloned());
-        edges.extend(roads.iter().cloned());
-        Terrain::new(&heights, &nodes, &edges)
-    }
     
     fn draw_terrain(&mut self) -> Vec<Command> {
-        self.terrain = TerrainHandler::compute_terrain(&self.heights, &self.river_nodes, &self.rivers, &self.road_nodes, &self.roads);
         let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
     
@@ -210,19 +193,23 @@ impl EventHandler for TerrainHandler {
                                     let edge = Edge::new(from, to);
                                     if !self.roads.contains(&edge) {
                                         self.roads.push(edge);
+                                        self.terrain.set_edge(&edge);
                                     } else {
                                         let index = self.roads.iter().position(|other| *other == edge).unwrap();
                                         self.roads.remove(index);
+                                        self.terrain.clear_edge(&edge);
                                     }
                                     self.road_nodes = vec![];
                                     for edge in self.roads.iter() {
-                                        if !edge.horizontal() {
-                                            self.road_nodes.push(Node::new(*edge.from(), 0.05, 0.0));
-                                            self.road_nodes.push(Node::new(*edge.to(), 0.05, 0.0));
+                                        let (from_node, to_node) = if !edge.horizontal() {
+                                            (Node::new(*edge.from(), 0.05, 0.0), Node::new(*edge.to(), 0.05, 0.0))
                                         } else {
-                                            self.road_nodes.push(Node::new(*edge.from(), 0.0, 0.05));
-                                            self.road_nodes.push(Node::new(*edge.to(), 0.0, 0.05));
-                                        }
+                                            (Node::new(*edge.from(), 0.0, 0.05), Node::new(*edge.to(), 0.0, 0.05))
+                                        };
+                                        self.terrain.set_node(&from_node);
+                                        self.terrain.set_node(&to_node);
+                                        self.road_nodes.push(from_node);
+                                        self.road_nodes.push(to_node);
                                     }
                                     let mut commands = vec![];
                                     commands.append(&mut self.draw_terrain());
