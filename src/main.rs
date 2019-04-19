@@ -77,10 +77,18 @@ pub struct TerrainHandler {
 impl TerrainHandler {
     pub fn new(heights: na::DMatrix<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> TerrainHandler {
 
+        let mut terrain = Terrain::new(heights.clone());
+        for node in river_nodes.iter() {
+            terrain.set_node(&node);
+        }
+        for river in rivers.iter() {
+            terrain.set_edge(&river);
+        }
+
         TerrainHandler{
             sea_level,
             world_coord: None,
-            terrain: Terrain::new(heights.clone(), &river_nodes, &rivers),
+            terrain,
             heights,
             river_nodes,
             rivers,
