@@ -8,7 +8,7 @@ use isometric::{Command, Event, IsometricEngine};
 use isometric::coords::*;
 use isometric::terrain::*;
 use isometric::drawing::*;
-use isometric::{M, v2};
+use isometric::{M, v2, V2};
 use isometric::Texture;
 use isometric::drawing::Text;
 use isometric::Font;
@@ -25,9 +25,12 @@ use pioneer::river_runner::get_junctions_and_rivers;
 use pioneer::rand::prelude::*;
 
 use std::sync::Arc;
+use std::collections::HashSet;
 
 mod house_builder;
 use house_builder::HouseBuilder;
+
+use std::time::{Duration, Instant};
 
 fn main() {
 
@@ -72,6 +75,7 @@ pub struct TerrainHandler {
     label_editor: Option<LabelEditor>,
     event_handlers: Vec<Box<EventHandler>>,
     avatar: Avatar,
+    terrain_colors: M<Color>,
 }
 
 impl TerrainHandler {
@@ -81,6 +85,7 @@ impl TerrainHandler {
             sea_level,
             world_coord: None,
             terrain: Terrain::new(heights.clone(), &river_nodes, &rivers),
+            terrain_colors: TerrainHandler::get_colors(&heights, sea_level),
             heights,
             river_nodes,
             rivers,
@@ -109,50 +114,86 @@ impl TerrainHandler {
             Command::Erase("selected_cell".to_string())
         }
     }
-    
-    fn draw_terrain(&mut self) -> Vec<Command> {
-        let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
-        let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
-    
-        vec![
-            Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
-            Command::Draw{name: "tiles".to_string(), drawing: self.draw_tiles()},
-            Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
-            Command::Draw{name: "rivers_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.river_nodes, river_color, 0.0))},
-            Command::Draw{name: "road".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.roads,road_color, -0.001))},
-            Command::Draw{name: "road_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.road_nodes, road_color, -0.001))},
-        ]
-    }
 
-    fn draw_tiles(&mut self) -> Box<Drawing + Send> {
-        let width = (self.heights.shape().0) - 1;
-        let height = (self.heights.shape().1) - 1;
-        let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
+
+    fn get_colors(heights: &M<f32>, sea_level: f32) -> M<Color> {
+        let width = (heights.shape().0) - 1;
+        let height = (heights.shape().1) - 1;
         let grass = Color::new(0.0, 0.75, 0.0, 1.0);
         let rock = Color::new(0.5, 0.4, 0.3, 1.0);
         let beach = Color::new(1.0, 1.0, 0.0, 1.0);
-        let beach_level = self.sea_level + 0.05;
+        let beach_level = sea_level + 0.05;
         let mut colors: M<Color> = M::from_element(width, height, grass);
-        for x in 0..self.heights.shape().0 - 1 {
-            for y in 0..self.heights.shape().1 - 1 {
-                if (self.heights[(x, y)] - self.heights[(x + 1, y)]).abs() > 0.533333333 
-                || (self.heights[(x + 1, y)]- self.heights[(x + 1, y + 1)]).abs() > 0.533333333 
-                || (self.heights[(x + 1, y + 1)]- self.heights[(x, y + 1)]).abs() > 0.533333333 
-                || (self.heights[(x, y + 1)]- self.heights[(x, y)]).abs() > 0.533333333    
+        for x in 0..heights.shape().0 - 1 {
+            for y in 0..heights.shape().1 - 1 {
+                if (heights[(x, y)] - heights[(x + 1, y)]).abs() > 0.533333333 
+                || (heights[(x + 1, y)]- heights[(x + 1, y + 1)]).abs() > 0.533333333 
+                || (heights[(x + 1, y + 1)]- heights[(x, y + 1)]).abs() > 0.533333333 
+                || (heights[(x, y + 1)]- heights[(x, y)]).abs() > 0.533333333    
                 {
                     colors[(x, y)] = rock;
                 } else if 
-                    self.heights[(x, y)] < beach_level &&
-                    self.heights[(x + 1, y)] < beach_level &&
-                    self.heights[(x + 1, y + 1)] < beach_level &&
-                    self.heights[(x, y + 1)] < beach_level 
+                    heights[(x, y)] < beach_level &&
+                    heights[(x + 1, y)] < beach_level &&
+                    heights[(x + 1, y + 1)] < beach_level &&
+                    heights[(x, y + 1)] < beach_level 
                 {
                     colors[(x, y)] = beach;
                 }
                 
             }
         }
-        Box::new(TerrainDrawing::from_matrix(&self.terrain, &colors, &shading))
+        colors
+    }
+
+    const SLAB_SIZE: usize = 32;
+
+    fn draw_all_tiles(&mut self) -> Vec<Command> {
+        let mut changes = vec![];
+        for x in 0..self.heights.shape().0 / TerrainHandler::SLAB_SIZE {
+            for y in 0..self.heights.shape().1 / TerrainHandler::SLAB_SIZE {
+                changes.push(v2(x * TerrainHandler::SLAB_SIZE, y * TerrainHandler::SLAB_SIZE));
+            }
+        }
+        self.draw_affected_tiles(changes)
+    }
+
+    fn get_slab(coordinate: V2<usize>) -> V2<usize> {
+        v2((coordinate.x / TerrainHandler::SLAB_SIZE) * TerrainHandler::SLAB_SIZE, (coordinate.y / TerrainHandler::SLAB_SIZE) * TerrainHandler::SLAB_SIZE)
+    }
+
+    fn draw_affected_tiles(&self, changes: Vec<V2<usize>>) -> Vec<Command> {
+        let mut affected = HashSet::new();
+
+        for changed in changes {
+            affected.insert(TerrainHandler::get_slab(changed));
+        }
+
+        let mut out = vec![];
+        for slab in affected {
+            out.push(self.draw_slab_tiles(slab));
+        }
+
+        let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
+        let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
+
+        out.append(&mut vec![
+            Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
+            Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
+            Command::Draw{name: "rivers_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.river_nodes, river_color, 0.0))},
+            Command::Draw{name: "road".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.roads,road_color, -0.001))},
+            Command::Draw{name: "road_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.road_nodes, road_color, -0.001))},
+        ]);
+
+        out
+    }
+
+
+    fn draw_slab_tiles(&self, slab: V2<usize>) -> Command {
+        let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
+        let to = v2((slab.x + TerrainHandler::SLAB_SIZE).min(self.heights.shape().0 - 1), (slab.y + TerrainHandler::SLAB_SIZE).min(self.heights.shape().1 - 1));
+        let name = format!("tiles{}-{}", slab.x, slab.y);
+        Command::Draw{name, drawing: Box::new(TerrainDrawing::from_matrix(&self.terrain, &self.terrain_colors, &shading, slab, to))}
     }
 
 }
@@ -179,7 +220,7 @@ impl EventHandler for TerrainHandler {
             }
             out.append(
                 &mut match *event {
-                    Event::Start => self.draw_terrain(),
+                    Event::Start => self.draw_all_tiles(),
                     Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![]},//self.select_cell()]},
                     Event::Key{key: VirtualKeyCode::R, state: ElementState::Pressed, ..} => {
                         if let Some(from) = self.avatar.position {
@@ -212,7 +253,7 @@ impl EventHandler for TerrainHandler {
                                         self.road_nodes.push(to_node);
                                     }
                                     let mut commands = vec![];
-                                    commands.append(&mut self.draw_terrain());
+                                    commands.append(&mut self.draw_affected_tiles(vec![from, to]));
                                     commands.append(&mut self.avatar.draw());
                                     commands
                                 } else {
