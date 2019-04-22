@@ -39,7 +39,7 @@ fn main() {
     let seed = 181; //181 is a good seed, also 182
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
-    for i in 0..9 {
+    for i in 0..11 {
         mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
         if i < 9 {
             let threshold = i * 2;
@@ -172,18 +172,10 @@ impl TerrainHandler {
         let mut out = vec![];
         for slab in affected {
             out.push(self.draw_slab_tiles(slab));
+            out.append(&mut self.draw_slab_roads_rivers(slab));
         }
 
-        let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
-        let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
-
-        out.append(&mut vec![
-            Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))},
-            Command::Draw{name: "river".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.rivers,river_color, 0.0))},
-            Command::Draw{name: "rivers_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.river_nodes, river_color, 0.0))},
-            Command::Draw{name: "road".to_string(), drawing: Box::new(EdgeDrawing::new(&self.terrain, &self.roads,road_color, -0.001))},
-            Command::Draw{name: "road_nodes".to_string(), drawing: Box::new(NodeDrawing::new(&self.terrain, &self.road_nodes, road_color, -0.001))},
-        ]);
+      
 
         out
     }
@@ -194,6 +186,33 @@ impl TerrainHandler {
         let to = v2((slab.x + TerrainHandler::SLAB_SIZE).min(self.heights.shape().0 - 1), (slab.y + TerrainHandler::SLAB_SIZE).min(self.heights.shape().1 - 1));
         let name = format!("tiles{}-{}", slab.x, slab.y);
         Command::Draw{name, drawing: Box::new(TerrainDrawing::from_matrix(&self.terrain, &self.terrain_colors, &shading, slab, to))}
+    }
+
+    fn draw_slab_roads_rivers(&self, slab: V2<usize>) -> Vec<Command> {
+        let river_color = Color::new(0.0, 0.0, 1.0, 1.0);
+        let road_color = Color::new(0.5, 0.5, 0.5, 1.0);
+
+        let slab_rivers: Vec<Edge> = self.rivers.iter().filter(|river| TerrainHandler::get_slab(*river.from()) == slab).map(|river| *river).collect();
+        let slab_river_nodes: Vec<Node> = self.river_nodes.iter().filter(|node| TerrainHandler::get_slab(node.position()) == slab).map(|node| *node).collect();
+        let slab_roads: Vec<Edge> = self.roads.iter().filter(|road| TerrainHandler::get_slab(*road.from()) == slab).map(|road| *road).collect();
+        let slab_road_nodes: Vec<Node> = self.road_nodes.iter().filter(|node| TerrainHandler::get_slab(node.position()) == slab).map(|node| *node).collect();
+
+        let river_string = format!("rivers{}-{}", slab.x, slab.y);
+        let river_node_string = format!("river_nodes{}-{}", slab.x, slab.y);
+        let road_string = format!("roads{}-{}", slab.x, slab.y);
+        let road_node_string = format!("road_nodes{}-{}", slab.x, slab.y);
+
+        let mut out = vec![];
+
+        out.append(&mut vec![
+            Command::Draw{name: river_string, drawing: Box::new(EdgeDrawing::new(&self.terrain, &slab_rivers,river_color, 0.0))},
+            Command::Draw{name: river_node_string, drawing: Box::new(NodeDrawing::new(&self.terrain, &slab_river_nodes, river_color, 0.0))},
+            Command::Draw{name: road_string, drawing: Box::new(EdgeDrawing::new(&self.terrain, &slab_roads,road_color, -0.001))},
+            Command::Draw{name: road_node_string, drawing: Box::new(NodeDrawing::new(&self.terrain, &slab_road_nodes, road_color, -0.001))},
+        ]);
+
+        out
+
     }
 
 }
@@ -220,7 +239,11 @@ impl EventHandler for TerrainHandler {
             }
             out.append(
                 &mut match *event {
-                    Event::Start => self.draw_all_tiles(),
+                    Event::Start => {
+                        let mut out = self.draw_all_tiles();
+                        out.push(Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))});
+                        out
+                    }
                     Event::WorldPositionChanged(world_coord) => {self.world_coord = Some(world_coord); vec![]},//self.select_cell()]},
                     Event::Key{key: VirtualKeyCode::R, state: ElementState::Pressed, ..} => {
                         if let Some(from) = self.avatar.position {
