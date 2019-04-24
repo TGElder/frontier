@@ -76,6 +76,7 @@ pub struct TerrainHandler {
     event_handlers: Vec<Box<EventHandler>>,
     avatar: Avatar,
     terrain_colors: M<Color>,
+    terrain_drawing: TerrainDrawing,
 }
 
 impl TerrainHandler {
@@ -86,6 +87,7 @@ impl TerrainHandler {
             world_coord: None,
             terrain: Terrain::new(heights.clone(), &river_nodes, &rivers),
             terrain_colors: TerrainHandler::get_colors(&heights, sea_level),
+            terrain_drawing: TerrainDrawing::new(heights.shape().0, heights.shape().1, TerrainHandler::SLAB_SIZE),
             heights,
             river_nodes,
             rivers,
@@ -162,7 +164,7 @@ impl TerrainHandler {
         v2((coordinate.x / TerrainHandler::SLAB_SIZE) * TerrainHandler::SLAB_SIZE, (coordinate.y / TerrainHandler::SLAB_SIZE) * TerrainHandler::SLAB_SIZE)
     }
 
-    fn draw_affected_tiles(&self, changes: Vec<V2<usize>>) -> Vec<Command> {
+    fn draw_affected_tiles(&mut self, changes: Vec<V2<usize>>) -> Vec<Command> {
         let mut affected = HashSet::new();
 
         for changed in changes {
@@ -171,21 +173,18 @@ impl TerrainHandler {
 
         let mut out = vec![];
         for slab in affected {
-            out.push(self.draw_slab_tiles(slab));
+            self.draw_slab_tiles(slab);
             out.append(&mut self.draw_slab_roads_rivers(slab));
         }
-
-      
 
         out
     }
 
 
-    fn draw_slab_tiles(&self, slab: V2<usize>) -> Command {
+    fn draw_slab_tiles(&mut self, slab: V2<usize>) {
         let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
         let to = v2((slab.x + TerrainHandler::SLAB_SIZE).min(self.heights.shape().0 - 1), (slab.y + TerrainHandler::SLAB_SIZE).min(self.heights.shape().1 - 1));
-        let name = format!("tiles{}-{}", slab.x, slab.y);
-        Command::Draw{name, drawing: Box::new(TerrainDrawing::from_matrix(&self.terrain, &self.terrain_colors, &shading, slab, to))}
+        self.terrain_drawing.draw_on(&self.terrain, &self.terrain_colors, &shading, slab, to);
     }
 
     fn draw_slab_roads_rivers(&self, slab: V2<usize>) -> Vec<Command> {
@@ -241,6 +240,7 @@ impl EventHandler for TerrainHandler {
                 &mut match *event {
                     Event::Start => {
                         let mut out = self.draw_all_tiles();
+                        out.push(Command::Draw{name: "terrain".to_string(), drawing: Box::new(self.terrain_drawing.clone())});
                         out.push(Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))});
                         out
                     }
