@@ -48,14 +48,15 @@ fn main() {
         println!("{}-{}", i, mesh.get_width());
     }
 
+    let max_height = 64.0;
     let sea_level = 0.5;
-    let before_sea_level = Scale::new((0.0, 16.0), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
+    let before_sea_level = Scale::new((0.0, max_height), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
     let (junctions, rivers) = get_junctions_and_rivers(&mesh, 256, before_sea_level, (0.01, 0.49), &mut rng);
 
-    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, 16.0)));
+    mesh = mesh.rescale(&Scale::new((mesh.get_min_z(), mesh.get_max_z()), (0.0, max_height)));
     let terrain = mesh.get_z_vector().map(|z| z as f32);
     
-    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, 16.0);
+    let mut engine = IsometricEngine::new("Isometric", 1024, 1024, max_height as f32);
     engine.add_event_handler(Box::new(TerrainHandler::new(terrain, junctions, rivers, sea_level as f32)));
     
     engine.run();
@@ -172,10 +173,12 @@ impl TerrainHandler {
         }
 
         let mut out = vec![];
+
         for slab in affected {
             self.draw_slab_tiles(slab);
             out.append(&mut self.draw_slab_roads_rivers(slab));
         }
+        out.push(Command::Draw{name: "terrain".to_string(), drawing: Box::new(self.terrain_drawing.clone())});
 
         out
     }
@@ -184,7 +187,7 @@ impl TerrainHandler {
     fn draw_slab_tiles(&mut self, slab: V2<usize>) {
         let shading: Box<SquareColoring> = Box::new(AngleSquareColoring::new(Color::new(1.0, 1.0, 1.0, 1.0), na::Vector3::new(1.0, 0.0, 1.0)));
         let to = v2((slab.x + TerrainHandler::SLAB_SIZE).min(self.heights.shape().0 - 1), (slab.y + TerrainHandler::SLAB_SIZE).min(self.heights.shape().1 - 1));
-        self.terrain_drawing.draw_on(&self.terrain, &self.terrain_colors, &shading, slab, to);
+        self.terrain_drawing.update(&self.terrain, &self.terrain_colors, &shading, slab, to);
     }
 
     fn draw_slab_roads_rivers(&self, slab: V2<usize>) -> Vec<Command> {
@@ -240,7 +243,6 @@ impl EventHandler for TerrainHandler {
                 &mut match *event {
                     Event::Start => {
                         let mut out = self.draw_all_tiles();
-                        out.push(Command::Draw{name: "terrain".to_string(), drawing: Box::new(self.terrain_drawing.clone())});
                         out.push(Command::Draw{name: "sea".to_string(), drawing: Box::new(SeaDrawing::new(self.heights.shape().0 as f32, self.heights.shape().1 as f32, self.sea_level))});
                         out
                     }
@@ -342,7 +344,6 @@ struct LabelEditor {
 }
 
 impl LabelEditor {
-
     fn new(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> LabelEditor {
         let x = world_coord.x.floor();
         let y = world_coord.y.floor();
