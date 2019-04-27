@@ -30,12 +30,10 @@ use std::sync::Arc;
 mod house_builder;
 use house_builder::HouseBuilder;
 
-use std::time::{Duration, Instant};
-
 fn main() {
     let mut mesh = Mesh::new(1, 0.0);
     mesh.set_z(0, 0, MAX);
-    let seed = 181; //181 is a good seed, also 182
+    let seed = 44; //181 is a good seed, also 182
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
     for i in 0..9 {
@@ -129,21 +127,6 @@ impl TerrainHandler {
 }
 
 impl TerrainHandler {
-    fn select_cell(&self) -> Command {
-        if let Some(world_coord) = self.world_coord {
-            let drawing = SelectedCellDrawing::select_cell(&self.terrain, world_coord);
-            match drawing {
-                Some(drawing) => Command::Draw {
-                    name: "selected_cell".to_string(),
-                    drawing: Box::new(drawing),
-                },
-                None => Command::Erase("selected_cell".to_string()),
-            }
-        } else {
-            Command::Erase("selected_cell".to_string())
-        }
-    }
-
     fn get_colors(heights: &M<f32>, sea_level: f32) -> M<Color> {
         let width = (heights.shape().0) - 1;
         let height = (heights.shape().1) - 1;
@@ -344,7 +327,6 @@ impl EventHandler for TerrainHandler {
                 }
                 _ => {
                     label_editor.text_editor.handle_event(event.clone());
-                    let position = label_editor.world_coord;
                     let name = format!("{:?}", label_editor.world_coord);
                     vec![Command::Draw {
                         name,
@@ -359,7 +341,7 @@ impl EventHandler for TerrainHandler {
         } else {
             let mut out = vec![];
             let event_handlers = &mut self.event_handlers;
-            for mut event_handler in event_handlers {
+            for event_handler in event_handlers {
                 out.append(&mut event_handler.handle_event(event.clone()));
             }
             out.append(&mut match *event {
@@ -439,7 +421,7 @@ impl EventHandler for TerrainHandler {
                     state: ElementState::Pressed,
                     ..
                 } => {
-                    if let Some(world_coord) = self.world_coord {
+                    if let Some(world_coord) = self.avatar.position {
                         self.label_editor = Some(LabelEditor::new(world_coord, &self.heights));
                     };
                     vec![]
