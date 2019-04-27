@@ -1,11 +1,11 @@
-use isometric::Color;
 use isometric::coords::WorldCoord;
-use isometric::{Command, Event};
-use isometric::EventHandler;
 use isometric::drawing::HouseDrawing;
+use isometric::Color;
+use isometric::EventHandler;
+use isometric::{Command, Event};
 use std::sync::Arc;
 
-use isometric::{VirtualKeyCode, ElementState};
+use isometric::{ElementState, VirtualKeyCode};
 
 const LAYER_NAME: &str = "house";
 
@@ -59,7 +59,7 @@ impl EventHandler for HouseBuilder {
                 self.world_coordinate = Some(world_coordinate);
                 vec![]
             }
-            Event::Key{
+            Event::Key {
                 key: VirtualKeyCode::B,
                 state: ElementState::Pressed,
                 ..
