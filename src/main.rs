@@ -98,7 +98,11 @@ impl TerrainHandler {
         TerrainHandler {
             sea_level,
             world_coord: None,
-            terrain: Terrain::new(heights.clone(), &river_nodes, &rivers),
+            terrain: Terrain::new(
+                heights.clone(),
+                &TerrainHandler::compute_nodes(&heights, &river_nodes, &vec![]),
+                &rivers,
+            ),
             terrain_colors: TerrainHandler::get_colors(&heights, sea_level),
             terrain_drawing: TerrainDrawing::new(
                 heights.shape().0,
@@ -222,6 +226,29 @@ impl TerrainHandler {
         );
         self.terrain_drawing
             .update(&self.terrain, &self.terrain_colors, &shading, slab, to);
+    }
+
+    fn compute_nodes(
+        heights: &M<f32>,
+        river_nodes: &Vec<Node>,
+        road_nodes: &Vec<Node>,
+    ) -> Vec<Node> {
+        let (width, height) = heights.shape();
+        let mut nodes = M::from_fn(width, height, |x, y| Node::point(v2(x, y)));
+        for node in river_nodes.iter().chain(road_nodes.iter()) {
+            let current_node = nodes[(node.position().x, node.position().y)];
+            let new_width = node.width().max(current_node.width());
+            let new_height = node.height().max(current_node.height());
+            nodes[(node.position().x, node.position().y)] =
+                Node::new(node.position(), new_width, new_height);
+        }
+        let mut out = vec![];
+        for node in nodes.iter() {
+            if node.width() > 0.0 || node.height() > 0.0 {
+                out.push(*node);
+            }
+        }
+        out
     }
 
     fn draw_slab_roads_rivers(&self, slab: V2<usize>) -> Vec<Command> {
@@ -372,6 +399,8 @@ impl EventHandler for TerrainHandler {
                                     let index =
                                         self.roads.iter().position(|other| *other == edge).unwrap();
                                     self.roads.remove(index);
+                                    self.terrain.set_node(Node::point(*edge.from()));
+                                    self.terrain.set_node(Node::point(*edge.to()));
                                     self.terrain.clear_edge(&edge);
                                 }
                                 self.road_nodes = vec![];
@@ -387,11 +416,10 @@ impl EventHandler for TerrainHandler {
                                             Node::new(*edge.to(), 0.0, 0.05),
                                         )
                                     };
-                                    self.terrain.set_node(&from_node);
-                                    self.terrain.set_node(&to_node);
                                     self.road_nodes.push(from_node);
                                     self.road_nodes.push(to_node);
                                 }
+                                self.terrain.set_nodes(&TerrainHandler::compute_nodes(&self.heights, &self.river_nodes, &self.road_nodes));
                                 let mut commands = vec![];
                                 commands.append(&mut self.draw_affected_tiles(vec![from, to]));
                                 commands.append(&mut self.avatar.draw());
