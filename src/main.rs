@@ -1,6 +1,8 @@
 extern crate image;
 extern crate nalgebra as na;
 
+mod world;
+
 use isometric::coords::*;
 use isometric::drawing::Text;
 use isometric::drawing::*;
@@ -33,10 +35,10 @@ use house_builder::HouseBuilder;
 fn main() {
     let mut mesh = Mesh::new(1, 0.0);
     mesh.set_z(0, 0, MAX);
-    let seed = 44; //181 is a good seed, also 182
+    let seed = 77; //181 is a good seed, also 182
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
-    for i in 0..9 {
+    for i in 0..10 {
         mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
         if i < 9 {
             let threshold = i * 2;
@@ -45,7 +47,7 @@ fn main() {
         println!("{}-{}", i, mesh.get_width());
     }
 
-    let max_height = 64.0;
+    let max_height = 24.0;
     let sea_level = 0.5;
     let before_sea_level =
         Scale::new((0.0, max_height), (mesh.get_min_z(), mesh.get_max_z())).scale(sea_level);
