@@ -1,5 +1,6 @@
 use isometric::terrain::*;
 use isometric::*;
+use isometric::drawing::TerrainDrawing;
 use std::ops::Range;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -251,9 +252,58 @@ impl World {
         self.terrain.set_node(self.get_node(edge.to()));
     }
 
-    
 }
 
+struct WorldArtist {
+    drawing: TerrainDrawing,
+    colors: M<Color>,
+    slab_size: usize,
+}
+
+impl WorldArtist {
+
+    pub fn new(elevations: &M<f32>, sea_level: f32, slab_size: usize) -> WorldArtist {
+        let (width, height) = elevations.shape();
+        WorldArtist{
+            drawing: TerrainDrawing::new(width, height, slab_size),
+            colors: WorldArtist::get_colors(elevations, sea_level),
+            slab_size
+        }
+    }
+
+    fn get_colors(elevations: &M<f32>, sea_level: f32) -> M<Color> {
+        let width = (elevations.shape().0) - 1;
+        let height = (elevations.shape().1) - 1;
+        let grass = Color::new(0.0, 0.75, 0.0, 1.0);
+        let rock = Color::new(0.5, 0.4, 0.3, 1.0);
+        let beach = Color::new(1.0, 1.0, 0.0, 1.0);
+        let beach_level = sea_level + 0.05;
+        let mut colors: M<Color> = M::from_element(width, height, grass);
+        for x in 0..elevations.shape().0 - 1 {
+            for y in 0..elevations.shape().1 - 1 {
+                if (elevations[(x, y)] - elevations[(x + 1, y)]).abs() > 0.533333333
+                    || (elevations[(x + 1, y)] - elevations[(x + 1, y + 1)]).abs() > 0.533333333
+                    || (elevations[(x + 1, y + 1)] - elevations[(x, y + 1)]).abs() > 0.533333333
+                    || (elevations[(x, y + 1)] - elevations[(x, y)]).abs() > 0.533333333
+                {
+                    colors[(x, y)] = rock;
+                } else if elevations[(x, y)] < beach_level
+                    && elevations[(x + 1, y)] < beach_level
+                    && elevations[(x + 1, y + 1)] < beach_level
+                    && elevations[(x, y + 1)] < beach_level
+                {
+                    colors[(x, y)] = beach;
+                }
+            }
+        }
+        colors
+    }
+
+    fn get_slab(position: V2<usize>) -> Slab {
+        
+    }
+
+}
 
 #[cfg(test)]
 mod roadset_tests {
@@ -603,10 +653,16 @@ mod world_tests {
             for y in 0..3 {
                 assert_eq!(
                     world.terrain.get_node(v2(x, y)),
-                    &Node::new(v2(x, y), before_widths[(x, y)], before_heights[(x, y)]),
+                    &Node::new(
+                        v2(x, y), 
+                        before_widths[(x, y)], 
+                        before_heights[(x, y)]
+                    ),
                 );
             }
         }
+        assert!(!world.terrain.is_edge(&Edge::new(v2(0, 0), v2(0, 1))));
+        assert!(!world.terrain.is_edge(&Edge::new(v2(0, 1), v2(1, 1))));
 
         world.add_road(&Edge::new(v2(0, 0), v2(0, 1)));
         world.add_road(&Edge::new(v2(0, 1), v2(1, 1)));
@@ -626,10 +682,17 @@ mod world_tests {
             for y in 0..3 {
                 assert_eq!(
                     world.terrain.get_node(v2(x, y)),
-                    &Node::new(v2(x, y), after_widths[(x, y)], after_heights[(x, y)]),
+                    &Node::new(
+                        v2(x, y),
+                        after_widths[(x, y)],
+                        after_heights[(x, y)]
+                    ),
                 );
             }
         }
+
+        assert!(world.terrain.is_edge(&Edge::new(v2(0, 0), v2(0, 1))));
+        assert!(world.terrain.is_edge(&Edge::new(v2(0, 1), v2(1, 1))));
 
         world.clear_road(&Edge::new(v2(0, 0), v2(0, 1)));
         world.clear_road(&Edge::new(v2(0, 1), v2(1, 1)));
@@ -638,10 +701,17 @@ mod world_tests {
             for y in 0..3 {
                 assert_eq!(
                     world.terrain.get_node(v2(x, y)),
-                    &Node::new(v2(x, y), before_widths[(x, y)], before_heights[(x, y)]),
+                     &Node::new(
+                        v2(x, y), 
+                        before_widths[(x, y)], 
+                        before_heights[(x, y)]
+                    ),
                 );
             }
         }
+
+        assert!(!world.terrain.is_edge(&Edge::new(v2(0, 0), v2(0, 1))));
+        assert!(!world.terrain.is_edge(&Edge::new(v2(0, 1), v2(1, 1))));
         
     }
 }
