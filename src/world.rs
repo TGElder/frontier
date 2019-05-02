@@ -121,6 +121,14 @@ impl RoadSet {
         self.get_junction(position).vertical.width()
     }
 
+    fn is_road(&self, edge: &Edge) -> bool {
+        if edge.horizontal() {
+            self.get_junction(&edge.from()).horizontal.from
+        } else {
+            self.get_junction(&edge.from()).vertical.from
+        }
+    }
+
     fn get_node(&self, position: V2<usize>) -> Node {
         let horizontal_width = self.get_horizontal_width(&position);
         let vertical_width = self.get_vertical_width(&position);
@@ -158,28 +166,96 @@ impl RoadSet {
     }
 }
 
-pub struct Rivers {
-    widths: M<bool>,
-    horizontal_edges: M<bool>,
-    vertical_edges: M<bool>,
+struct Slab {
+    from: V2<usize>,
+    slab_size: usize,
+}
+
+impl Slab {
+    fn new(from: V2<usize>, slab_size: usize) -> Slab {
+        Slab{from, slab_size}
+    }
+
+    fn to(&self) -> V2<usize> {
+        v2(self.from.x + self.slab_size, self.from.y + self.slab_size)
+    }
 }
 
 pub struct World {
+    width: usize,
+    height: usize,
     terrain: Terrain,
+    slab_size: usize,
     rivers: RoadSet,
     roads: RoadSet,
     sea_level: f32,
 }
 
 impl World {
-    pub fn new(heights: M<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) {
-
+    pub fn new(elevations: M<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> World {
+        let (width, height) = elevations.shape();
+        World{
+            width,
+            height,
+            terrain: Terrain::new(elevations, &river_nodes, &rivers),
+            slab_size: 64,
+            rivers: World::setup_rivers(width, height, river_nodes, rivers),
+            roads: RoadSet::new(width, height, 0.25),
+            sea_level
+        }
     }
+
+    fn setup_rivers(width: usize, height: usize, river_nodes: Vec<Node>, rivers: Vec<Edge>) -> RoadSet {
+        let mut out = RoadSet::new(width, height, 0.0);
+        out.set_widths_from_nodes(&river_nodes);
+        out.add_roads(&rivers);
+        out
+    }
+
+    fn get_horizontal_width(&self, position: &V2<usize>) -> f32 {
+        self.rivers.get_horizontal_width(position).max(self.roads.get_horizontal_width(position))
+    }
+
+    fn get_vertical_width(&self, position: &V2<usize>) -> f32 {
+        self.rivers.get_vertical_width(position).max(self.roads.get_vertical_width(position))
+    }
+
+    fn is_road(&self, edge: &Edge) -> bool {
+        self.rivers.is_road(edge) || self.roads.is_road(edge)
+    }
+
+    fn get_node(&self, position: &V2<usize>) -> Node {
+        let width = self.get_horizontal_width(position);
+        let height = self.get_vertical_width(position);
+        Node::new(*position, width, height)
+    }
+
+    fn add_road(&mut self, edge: &Edge) {
+        self.roads.add_road(edge);
+        self.update_terrain(edge);
+    }
+
+    fn clear_road(&mut self, edge: &Edge) {
+        self.roads.clear_road(edge);
+        self.update_terrain(edge);
+    }
+
+    fn update_terrain(&mut self, edge: &Edge) {
+        if self.is_road(edge) {
+            self.terrain.set_edge(edge);
+        } else {
+            self.terrain.clear_edge(edge);
+        }    
+        self.terrain.set_node(self.get_node(edge.from()));
+        self.terrain.set_node(self.get_node(edge.to()));
+    }
+
+    
 }
 
 
 #[cfg(test)]
-mod tests {
+mod roadset_tests {
 
     use super::*;
 
@@ -388,6 +464,16 @@ mod tests {
     }
 
     #[test]
+    fn test_is_road_l() {
+        let roadset = l();
+        assert!(roadset.is_road(&Edge::new(v2(0, 0), v2(1, 0))));
+        assert!(roadset.is_road(&Edge::new(v2(0, 0), v2(0, 1))));
+        assert!(!roadset.is_road(&Edge::new(v2(0, 1), v2(1, 1))));
+        assert!(!roadset.is_road(&Edge::new(v2(1, 0), v2(1, 1))));
+    }
+
+
+    #[test]
     fn test_get_horizontal_width_parallel() {
         let roadset = parallel();
         assert_eq!(roadset.get_horizontal_width(&v2(0, 0)), 9.0);
@@ -403,6 +489,15 @@ mod tests {
         assert_eq!(roadset.get_vertical_width(&v2(1, 0)), 0.0);
         assert_eq!(roadset.get_vertical_width(&v2(0, 1)), 0.0);
         assert_eq!(roadset.get_vertical_width(&v2(1, 1)), 0.0);
+    }
+
+     #[test]
+    fn test_is_road_parallel() {
+        let roadset = parallel();
+        assert!(roadset.is_road(&Edge::new(v2(0, 0), v2(1, 0))));
+        assert!(roadset.is_road(&Edge::new(v2(0, 1), v2(1, 1))));
+        assert!(!roadset.is_road(&Edge::new(v2(0, 0), v2(0, 1))));
+        assert!(!roadset.is_road(&Edge::new(v2(1, 0), v2(1, 1))));
     }
 
     #[test]
@@ -454,3 +549,36 @@ mod tests {
 
 }
 
+
+#[cfg(test)]
+mod world_tests {
+    
+    use super::*;
+
+    pub fn world() -> World {
+        World::new(
+            M::from_element(3, 3, 1.0),
+            vec![
+                Node::new(v2(0, 0), 0.1, 0.0),
+                Node::new(v2(1, 0), 0.2, 0.0),
+                Node::new(v2(2, 0), 0.3, 0.0),
+            ],
+            vec![
+                Edge::new(v2(0, 0), v2(1, 0)),
+                Edge::new(v2(1, 0), v2(2, 0)),
+            ],
+            0.5
+        )
+    }
+
+    #[test]
+    pub fn test_terrain() {
+        let terrain = world().terrain;
+
+        assert_eq!(terrain.get_node(v2(0, 0)), &Node::new(v2(0, 0), 0.1, 0.0));
+        assert_eq!(terrain.get_node(v2(1, 0)), &Node::new(v2(1, 0), 0.2, 0.0));
+        assert_eq!(terrain.get_node(v2(2, 0)), &Node::new(v2(2, 0), 0.3, 0.0));
+        assert!(terrain.is_edge(&Edge::new(v2(0, 0), v2(1, 0))));
+        assert!(terrain.is_edge(&Edge::new(v2(1, 0), v2(2, 0))));
+    }
+}
