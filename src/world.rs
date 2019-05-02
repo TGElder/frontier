@@ -51,8 +51,6 @@ impl RoadSet {
         }
     }
 
-   
-
     pub fn width(&self) -> usize {
         self.junctions.shape().0
     }
@@ -72,8 +70,8 @@ impl RoadSet {
     pub fn set_widths_from_nodes(&mut self, nodes: &Vec<Node>) {
         for node in nodes {
             let mut junction = self.get_junction_mut(&node.position());
-            junction.horizontal.width = node.width();
-            junction.vertical.width = node.height();
+            junction.vertical.width = node.width();
+            junction.horizontal.width = node.height();
         }    
     }
 
@@ -192,6 +190,9 @@ pub struct World {
 }
 
 impl World {
+
+    const road_width: f32 = 0.25;
+    
     pub fn new(elevations: M<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> World {
         let (width, height) = elevations.shape();
         World{
@@ -200,7 +201,7 @@ impl World {
             terrain: Terrain::new(elevations, &river_nodes, &rivers),
             slab_size: 64,
             rivers: World::setup_rivers(width, height, river_nodes, rivers),
-            roads: RoadSet::new(width, height, 0.25),
+            roads: RoadSet::new(width, height, World::road_width),
             sea_level
         }
     }
@@ -225,8 +226,8 @@ impl World {
     }
 
     fn get_node(&self, position: &V2<usize>) -> Node {
-        let width = self.get_horizontal_width(position);
-        let height = self.get_vertical_width(position);
+        let width = self.get_vertical_width(position);
+        let height = self.get_horizontal_width(position);
         Node::new(*position, width, height)
     }
 
@@ -299,26 +300,26 @@ mod roadset_tests {
         ]);
         assert_eq!(roadset.get_junction(&v2(0, 0)),
             &Junction{
-                horizontal: HalfJunction{ width: 0.1, from: true, to: false },
-                vertical: HalfJunction{ width: 0.2, from: true, to: false }
+                horizontal: HalfJunction{ width: 0.2, from: true, to: false },
+                vertical: HalfJunction{ width: 0.1, from: true, to: false }
             }
         );
         assert_eq!(roadset.get_junction(&v2(1, 0)),
             &Junction{
-                horizontal: HalfJunction{ width: 0.3, from: false, to: true },
-                vertical: HalfJunction{ width: 0.4, from: false, to: false }
+                horizontal: HalfJunction{ width: 0.4, from: false, to: true },
+                vertical: HalfJunction{ width: 0.3, from: false, to: false }
             }
         );
         assert_eq!(roadset.get_junction(&v2(0, 1)),
             &Junction{
-                horizontal: HalfJunction{ width: 0.5, from: false, to: false },
-                vertical: HalfJunction{ width: 0.6, from: false, to: true }
+                horizontal: HalfJunction{ width: 0.6, from: false, to: false },
+                vertical: HalfJunction{ width: 0.5, from: false, to: true }
             }
         );
         assert_eq!(roadset.get_junction(&v2(1, 1)),
             &Junction{
-                horizontal: HalfJunction{ width: 0.7, from: false, to: false },
-                vertical: HalfJunction{ width: 0.8, from: false, to: false }
+                horizontal: HalfJunction{ width: 0.8, from: false, to: false },
+                vertical: HalfJunction{ width: 0.7, from: false, to: false }
             }
         );
 
@@ -555,30 +556,92 @@ mod world_tests {
     
     use super::*;
 
-    pub fn world() -> World {
+    fn world() -> World {
         World::new(
             M::from_element(3, 3, 1.0),
             vec![
-                Node::new(v2(0, 0), 0.1, 0.0),
-                Node::new(v2(1, 0), 0.2, 0.0),
-                Node::new(v2(2, 0), 0.3, 0.0),
+                Node::new(v2(1, 0), 0.1, 0.0),
+                Node::new(v2(1, 1), 0.2, 0.0),
+                Node::new(v2(1, 2), 0.3, 0.0),
             ],
             vec![
-                Edge::new(v2(0, 0), v2(1, 0)),
-                Edge::new(v2(1, 0), v2(2, 0)),
+                Edge::new(v2(1, 0), v2(1, 1)),
+                Edge::new(v2(1, 1), v2(1, 2)),
             ],
             0.5
         )
     }
 
     #[test]
-    pub fn test_terrain() {
+    fn test_terrain() {
         let terrain = world().terrain;
 
-        assert_eq!(terrain.get_node(v2(0, 0)), &Node::new(v2(0, 0), 0.1, 0.0));
-        assert_eq!(terrain.get_node(v2(1, 0)), &Node::new(v2(1, 0), 0.2, 0.0));
-        assert_eq!(terrain.get_node(v2(2, 0)), &Node::new(v2(2, 0), 0.3, 0.0));
-        assert!(terrain.is_edge(&Edge::new(v2(0, 0), v2(1, 0))));
-        assert!(terrain.is_edge(&Edge::new(v2(1, 0), v2(2, 0))));
+        assert_eq!(terrain.get_node(v2(1, 0)), &Node::new(v2(1, 0), 0.1, 0.0));
+        assert_eq!(terrain.get_node(v2(1, 1)), &Node::new(v2(1, 1), 0.2, 0.0));
+        assert_eq!(terrain.get_node(v2(1, 2)), &Node::new(v2(1, 2), 0.3, 0.0));
+        assert!(terrain.is_edge(&Edge::new(v2(1, 0), v2(1, 1))));
+        assert!(terrain.is_edge(&Edge::new(v2(1, 1), v2(1, 2))));
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn test_add_and_clear_road() {
+        let mut world = world();
+
+        let before_widths = M::from_vec(3, 3, vec![
+            0.0, 0.1, 0.0,
+            0.0, 0.2, 0.0,
+            0.0, 0.3, 0.0,
+        ]);
+        let before_heights = M::from_vec(3, 3, vec![
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+        ]);
+       
+        for x in 0..3 {
+            for y in 0..3 {
+                assert_eq!(
+                    world.terrain.get_node(v2(x, y)),
+                    &Node::new(v2(x, y), before_widths[(x, y)], before_heights[(x, y)]),
+                );
+            }
+        }
+
+        world.add_road(&Edge::new(v2(0, 0), v2(0, 1)));
+        world.add_road(&Edge::new(v2(0, 1), v2(1, 1)));
+
+        let after_widths = M::from_vec(3, 3, vec![
+            World::road_width, 0.1, 0.0,
+            World::road_width, 0.2, 0.0,
+            0.0, 0.3, 0.0,
+        ]);
+        let after_heights = M::from_vec(3, 3, vec![
+            0.0, 0.0, 0.0,
+            World::road_width, World::road_width, 0.0,
+            0.0, 0.0, 0.0,
+        ]);
+
+        for x in 0..3 {
+            for y in 0..3 {
+                assert_eq!(
+                    world.terrain.get_node(v2(x, y)),
+                    &Node::new(v2(x, y), after_widths[(x, y)], after_heights[(x, y)]),
+                );
+            }
+        }
+
+        world.clear_road(&Edge::new(v2(0, 0), v2(0, 1)));
+        world.clear_road(&Edge::new(v2(0, 1), v2(1, 1)));
+
+        for x in 0..3 {
+            for y in 0..3 {
+                assert_eq!(
+                    world.terrain.get_node(v2(x, y)),
+                    &Node::new(v2(x, y), before_widths[(x, y)], before_heights[(x, y)]),
+                );
+            }
+        }
+        
     }
 }
