@@ -91,8 +91,7 @@ impl TerrainHandler {
         rivers: Vec<Edge>,
         sea_level: f32,
     ) -> TerrainHandler {
-        println!("{:?}", river_nodes);
-        let mut world_artist = WorldArtist::new(&heights, sea_level, 32);
+        let mut world_artist = WorldArtist::new(&heights, sea_level, 64);
         let world = World::new(heights.clone(), river_nodes, rivers, sea_level);
         world_artist.draw_all(world.terrain());
         TerrainHandler {
