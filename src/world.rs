@@ -123,13 +123,13 @@ impl RoadSet {
         }
     }
 
-    fn get_node(&self, position: V2<usize>) -> Node {
+    pub fn get_node(&self, position: V2<usize>) -> Node {
         let width = self.get_vertical_width(&position);
         let height = self.get_horizontal_width(&position);
         Node::new(position, width, height)
     }
 
-    fn get_nodes(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Node> {
+    pub fn get_nodes(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Node> {
         let mut out = vec![];
         for x in x_range {
             for y in y_range.start..y_range.end {
@@ -142,7 +142,7 @@ impl RoadSet {
         out
     }
 
-    fn get_edges(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Edge> {
+    pub fn get_edges(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Edge> {
         let mut out = vec![];
         for x in x_range {
             for y in y_range.start..y_range.end {
@@ -184,6 +184,18 @@ impl World {
 
     pub fn terrain(&self) -> &Terrain {
         &self.terrain
+    }
+
+    pub fn rivers(&self) -> &RoadSet {
+        &self.rivers
+    }
+
+    pub fn roads(&self) -> &RoadSet {
+        &self.roads
+    }
+
+    pub fn sea_level(&self) -> f32 {
+        self.sea_level
     }
 
     fn setup_rivers(width: usize, height: usize, river_nodes: Vec<Node>, rivers: Vec<Edge>) -> RoadSet {

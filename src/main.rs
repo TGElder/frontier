@@ -91,10 +91,11 @@ impl TerrainHandler {
         rivers: Vec<Edge>,
         sea_level: f32,
     ) -> TerrainHandler {
-        let mut world_artist = WorldArtist::new(&heights, sea_level, 64);
         let world = World::new(heights.clone(), river_nodes, rivers, sea_level);
-        world_artist.draw_all(world.terrain());
+        let world_artist = WorldArtist::new(&world, 64); 
         TerrainHandler {
+            world,
+            world_artist,
             world_coord: None,
             heights, //TODO remove
             font: Arc::new(Font::from_csv_and_texture(
@@ -107,8 +108,6 @@ impl TerrainHandler {
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
             avatar: Avatar::new(),
-            world_artist,
-            world,
         }
     }
 }
@@ -145,10 +144,7 @@ impl EventHandler for TerrainHandler {
                 out.append(&mut event_handler.handle_event(event.clone()));
             }
             out.append(&mut match *event {
-                Event::Start => vec![
-                    self.world_artist.draw_terrain(),
-                    self.world_artist.draw_sea(),
-                ],
+                Event::Start => self.world_artist.init(&self.world),
                 Event::WorldPositionChanged(world_coord) => {
                     self.world_coord = Some(world_coord);
                     vec![]
@@ -167,7 +163,7 @@ impl EventHandler for TerrainHandler {
 
                                 let edge = Edge::new(from, to);
                                 self.world.toggle_road(&edge);
-                                let mut commands = self.world_artist.draw_affected(self.world.terrain(), vec![from, to]);
+                                let mut commands = self.world_artist.draw_affected(&self.world, vec![from, to]);
                                 commands.append(&mut self.avatar.draw());
                                 commands
                             } else {

@@ -1,7 +1,9 @@
 use isometric::terrain::*;
 use isometric::*;
-use isometric::drawing::{TerrainDrawing, SeaDrawing, SquareColoring, AngleSquareColoring};
+use isometric::drawing::*;
 use std::collections::HashSet;
+use std::ops::Range;
+use super::world::World;
 
 #[derive(Hash, PartialEq, Eq, Debug)]
 struct Slab {
@@ -24,7 +26,6 @@ impl Slab {
 pub struct WorldArtist {
     width: usize,
     height: usize,
-    sea_level: f32,
     drawing: TerrainDrawing,
     colors: M<Color>,
     shading: Box<SquareColoring>,
@@ -33,14 +34,13 @@ pub struct WorldArtist {
 
 impl WorldArtist {
 
-    pub fn new(elevations: &M<f32>, sea_level: f32, slab_size: usize) -> WorldArtist {
-        let (width, height) = elevations.shape();
+    pub fn new(world: &World, slab_size: usize) -> WorldArtist {
+        let (width, height) = world.terrain().elevations().shape();
         WorldArtist{
             width,
             height,
-            sea_level,
             drawing: TerrainDrawing::new(width, height, slab_size),
-            colors: WorldArtist::get_colors(elevations, sea_level),
+            colors: WorldArtist::get_colors(world),
             shading: WorldArtist::get_shading(),
             slab_size
         }
@@ -53,7 +53,9 @@ impl WorldArtist {
         ))
     }
 
-    fn get_colors(elevations: &M<f32>, sea_level: f32) -> M<Color> {
+    fn get_colors(world: &World) -> M<Color> {
+        let elevations = world.terrain().elevations();
+        let sea_level = world.sea_level();
         let width = (elevations.shape().0) - 1;
         let height = (elevations.shape().1) - 1;
         let grass = Color::new(0.0, 0.75, 0.0, 1.0);
@@ -88,32 +90,100 @@ impl WorldArtist {
         }
     }
 
-    pub fn draw_sea(&self) -> Command {
+    pub fn draw_sea(&self, world: &World) -> Command {
         Command::Draw {
             name: "sea".to_string(),
             drawing: Box::new(SeaDrawing::new(
                 self.width as f32,
                 self.height as f32,
-                self.sea_level,
+                world.sea_level(),
             )),
         }
     }
 
-    fn draw_slab(&mut self, terrain: &Terrain, slab: Slab) -> Vec<Command> {
-        self.draw_slab_tiles(terrain, slab);
-        vec![]
+    fn draw_slab(&mut self, world: &World, slab: &Slab) -> Vec<Command> {
+        self.draw_slab_tiles(world, slab);
+        let mut out = vec![];
+        out.append(&mut self.draw_slab_rivers_roads(world, &slab));
+        out
     }
 
-    fn draw_slab_tiles(&mut self, terrain: &Terrain, slab: Slab) {
+    fn draw_slab_tiles(&mut self, world: &World, slab: &Slab) {
         let to = slab.to(); 
-        let to = v2(to.x.min(self.width - 1), to.y.min(self.height - 1)); //TODO
-        self.drawing.update(terrain, &self.colors, &self.shading, slab.from, to);
+        let to = v2(to.x.min(self.width - 1), to.y.min(self.height - 1));
+        self.drawing.update(world.terrain(), &self.colors, &self.shading, slab.from, to);
     }
 
-    fn draw_slabs(&mut self, terrain: &Terrain, slabs: HashSet<Slab>) -> Vec<Command> {
+    fn get_road_river_nodes(&self, world: &World, x_range: Range<usize>, y_range: Range<usize>) -> (Vec<Node>, Vec<Node>) {
+        let mut road_nodes = vec![];
+        let mut river_nodes = vec![];
+        for x in x_range {
+            for y in y_range.start..y_range.end {
+                let road_node = world.roads().get_node(v2(x, y));
+                let river_node = world.rivers().get_node(v2(x, y));
+                if road_node.width() > 0.0 || road_node.height() > 0.0 {
+                    road_nodes.push(road_node);
+                } else if river_node.width() > 0.0 || river_node.height() > 0.0 {
+                    river_nodes.push(river_node)
+                }
+            }
+        }
+        (road_nodes, river_nodes)
+    }
+
+    fn draw_slab_rivers_roads(&mut self,
+        world: &World,
+        slab: &Slab
+    ) -> Vec<Command> {
+        let river_color = &Color::new(0.0, 0.0, 1.0, 1.0);
+        let road_color = &Color::new(0.5, 0.5, 0.5, 1.0);
+        let river_edges = world.rivers().get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let road_edges = world.roads().get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let (road_nodes, river_nodes) = self.get_road_river_nodes(world, slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        vec![
+            Command::Draw{
+                name: format!("{:?}-river-edges", slab.from),
+                drawing: Box::new(EdgeDrawing::new(
+                    world.terrain(),
+                    &river_edges,
+                    &river_color,
+                    0.0
+                ))
+            },
+            Command::Draw{
+                name: format!("{:?}-road-edges", slab.from),
+                drawing: Box::new(EdgeDrawing::new(
+                    world.terrain(),
+                    &road_edges,
+                    &road_color,
+                    0.0
+                ))
+            },
+            Command::Draw{
+                name: format!("{:?}-river-nodes", slab.from),
+                drawing: Box::new(NodeDrawing::new(
+                    world.terrain(),
+                    &river_nodes,
+                    &river_color,
+                    0.0
+                ))
+            },
+            Command::Draw{
+                name: format!("{:?}-road-nodes", slab.from),
+                drawing: Box::new(NodeDrawing::new(
+                    world.terrain(),
+                    &road_nodes,
+                    &road_color,
+                    0.0
+                ))
+            },
+        ]
+    }
+
+    fn draw_slabs(&mut self, world: &World, slabs: HashSet<Slab>) -> Vec<Command> {
         let mut out = vec![];
         for slab in slabs {
-            out.append(&mut self.draw_slab(terrain, slab));
+            out.append(&mut self.draw_slab(world, &slab));
 
         }
         out.push(self.draw_terrain());
@@ -124,8 +194,8 @@ impl WorldArtist {
         positions.into_iter().map(|position| Slab::new(position, self.slab_size)).collect()
     }
 
-    pub fn draw_affected(&mut self, terrain: &Terrain, positions: Vec<V2<usize>>) -> Vec<Command> {
-        self.draw_slabs(terrain, self.get_affected_slabs(positions))
+    pub fn draw_affected(&mut self, world: &World, positions: Vec<V2<usize>>) -> Vec<Command> {
+        self.draw_slabs(world, self.get_affected_slabs(positions))
     }
 
     fn get_all_slabs(&self) -> HashSet<Slab> {
@@ -142,8 +212,16 @@ impl WorldArtist {
         out
     }
 
-    pub fn draw_all(&mut self, terrain: &Terrain) -> Vec<Command> {
-        self.draw_slabs(terrain, self.get_all_slabs())
+    fn draw_all(&mut self, world: &World) -> Vec<Command> {
+        self.draw_slabs(world, self.get_all_slabs())
+    }
+
+    pub fn init(&mut self, world: &World) -> Vec<Command> {
+        let mut out = vec![];
+        out.push(self.draw_terrain());
+        out.push(self.draw_sea(world));
+        out.append(&mut self.draw_all(world));
+        out
     }
 
 }
