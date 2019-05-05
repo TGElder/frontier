@@ -3,6 +3,7 @@ use isometric::drawing::Billboard;
 use isometric::Command;
 use isometric::Texture;
 use std::sync::Arc;
+use std::f32::consts::PI;
 
 enum Rotation {
     Left,
@@ -41,30 +42,39 @@ impl Rotation {
             Rotation::DownLeft => Rotation::Down,
         }
     }
+
+    fn angle(&self) -> f32 {
+        match self {
+            Rotation::Left => 0.0 * (PI / 4.0),
+            Rotation::UpLeft => 1.0 * (PI / 4.0),
+            Rotation::Up => 2.0 * (PI / 4.0),
+            Rotation::UpRight => 3.0 * (PI / 4.0),
+            Rotation::Right => 4.0 * (PI / 4.0),
+            Rotation::DownRight => 5.0 * (PI / 4.0),
+            Rotation::Down => 6.0 * (PI / 4.0),
+            Rotation::DownLeft => 7.0 * (PI / 4.0),
+        }
+    }
 }
 
 pub struct Avatar {
     rotation: Rotation,
-    sprite_rotation: Rotation,
     position: Option<WorldCoord>,
-    texture_front: Arc<Texture>,
-    texture_back: Arc<Texture>,
-    texture_up: Arc<Texture>,
-    texture_down: Arc<Texture>,
-    texture_side: Arc<Texture>,
+    texture_body: Arc<Texture>,
+    texture_head: Arc<Texture>,
+    texture_eye: Arc<Texture>,
+    texture_hand: Arc<Texture>,
 }
 
 impl Avatar {
     pub fn new() -> Avatar {
         Avatar {
             rotation: Rotation::Up,
-            sprite_rotation: Rotation::DownRight,
             position: None,
-            texture_front: Arc::new(Texture::new(image::open("link_front.png").unwrap())),
-            texture_back: Arc::new(Texture::new(image::open("link_back.png").unwrap())),
-            texture_up: Arc::new(Texture::new(image::open("link_up.png").unwrap())),
-            texture_down: Arc::new(Texture::new(image::open("link_down.png").unwrap())),
-            texture_side: Arc::new(Texture::new(image::open("link_side.png").unwrap())),
+            texture_body: Arc::new(Texture::new(image::open("torso.png").unwrap())),
+            texture_head: Arc::new(Texture::new(image::open("head.png").unwrap())),
+            texture_eye: Arc::new(Texture::new(image::open("eye.png").unwrap())),
+            texture_hand: Arc::new(Texture::new(image::open("hand.png").unwrap())),
         }
     }
 
@@ -80,14 +90,6 @@ impl Avatar {
         self.rotation = self.rotation.anticlockwise();
     }
 
-    pub fn rotate_sprite_clockwise(&mut self) {
-        self.sprite_rotation = self.sprite_rotation.clockwise();
-    }
-
-    pub fn rotate_sprite_anticlockwise(&mut self) {
-        self.sprite_rotation = self.sprite_rotation.anticlockwise();
-    }
-
     pub fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
         if let Some(world_coord) = world_coord {
             self.position = Some(Avatar::snap(world_coord, heights));
@@ -97,7 +99,7 @@ impl Avatar {
     fn snap(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> WorldCoord {
         let x = world_coord.x.floor();
         let y = world_coord.y.floor();
-        let z = heights[(x as usize, y as usize)] + 0.1875;
+        let z = heights[(x as usize, y as usize)] + 0.1;
         WorldCoord::new(x, y, z)
     }
 
@@ -118,85 +120,81 @@ impl Avatar {
     }
 
     pub fn draw(&self) -> Vec<Command> {
-        const NAME: &str = "avatar";
         if let Some(position) = self.position {
-            let command = match self.sprite_rotation {
-                Rotation::Left => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        0.25,
-                        0.375,
-                        self.texture_front.clone(),
-                    )),
-                },
-                Rotation::UpLeft => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        0.25,
-                        0.375,
-                        self.texture_down.clone(),
-                    )),
-                },
-                Rotation::Up => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        -0.25,
-                        0.375,
-                        self.texture_front.clone(),
-                    )),
-                },
-                Rotation::UpRight => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        -0.25,
-                        0.375,
-                        self.texture_side.clone(),
-                    )),
-                },
-                Rotation::Right => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        -0.25,
-                        0.375,
-                        self.texture_back.clone(),
-                    )),
-                },
-                Rotation::DownRight => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        0.25,
-                        0.375,
-                        self.texture_up.clone(),
-                    )),
-                },
-                Rotation::Down => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        0.25,
-                        0.375,
-                        self.texture_back.clone(),
-                    )),
-                },
-                Rotation::DownLeft => Command::Draw {
-                    name: NAME.to_string(),
-                    drawing: Box::new(Billboard::new(
-                        position,
-                        0.25,
-                        0.375,
-                        self.texture_side.clone(),
-                    )),
-                },
+            let draw_body = Command::Draw {
+                name: "body".to_string(),
+                drawing: Box::new(Billboard::new(
+                    position,
+                    0.1,
+                    0.2,
+                    self.texture_body.clone(),
+                )),
             };
-            vec![command, Command::LookAt(position)]
+            let angle = self.rotation.angle();
+            let x_offset = angle.cos() * 0.02;
+            let y_offset = angle.sin() * 0.02;
+            let head_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
+            let draw_head = Command::Draw {
+                name: "head".to_string(),
+                drawing: Box::new(Billboard::new(
+                    head_position,
+                    0.1,
+                    0.2,
+                    self.texture_head.clone(),
+                )),
+            };
+            let x_offset = angle.cos() * 0.06 - angle.sin() * 0.019;
+            let y_offset = angle.cos() * 0.019 + angle.sin() * 0.06;
+            let left_eye_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
+            let draw_left_eye = Command::Draw {
+                name: "left_eye".to_string(),
+                drawing: Box::new(Billboard::new(
+                    left_eye_position,
+                    0.0125,
+                    0.2,
+                    self.texture_eye.clone(),
+                )),
+            };
+            let x_offset = angle.cos() * 0.06 + angle.sin() * 0.019;
+            let y_offset = - angle.cos() * 0.019 + angle.sin() * 0.06;
+            let right_eye_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
+            let draw_right_eye = Command::Draw {
+                name: "right_eye".to_string(),
+                drawing: Box::new(Billboard::new(
+                    right_eye_position,
+                    0.0125,
+                    0.2,
+                    self.texture_eye.clone(),
+                )),
+            };
+            let x_offset = angle.cos() * 0.035 - angle.sin() * 0.035;
+            let y_offset = angle.cos() * 0.035 + angle.sin() * 0.035;
+            let left_hand_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
+            let draw_left_hand = Command::Draw {
+                name: "left_hand".to_string(),
+                drawing: Box::new(Billboard::new(
+                    left_hand_position,
+                    0.1,
+                    0.2,
+                    self.texture_hand.clone(),
+                )),
+            };
+            let x_offset = angle.cos() * 0.035 + angle.sin() * 0.035;
+            let y_offset = -angle.cos() * 0.035 + angle.sin() * 0.035;
+            let right_hand_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
+            let draw_right_hand = Command::Draw {
+                name: "right_hand".to_string(),
+                drawing: Box::new(Billboard::new(
+                    right_hand_position,
+                    0.1,
+                    0.2,
+                    self.texture_hand.clone(),
+                )),
+            };
+            vec![draw_body, draw_head, draw_left_eye, draw_right_eye, draw_left_hand, draw_right_hand, Command::LookAt(position)]
         } else {
             vec![]
         }
     }
 }
+

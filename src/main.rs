@@ -203,19 +203,14 @@ impl EventHandler for TerrainHandler {
                     VirtualKeyCode::A => {
                         self.avatar.rotate_anticlockwise();
                         self.avatar.rotate_anticlockwise();
-                        self.avatar.rotate_sprite_anticlockwise();
-                        self.avatar.rotate_sprite_anticlockwise();
                         self.avatar.draw()
                     }
                     VirtualKeyCode::D => {
                         self.avatar.rotate_clockwise();
                         self.avatar.rotate_clockwise();
-                        self.avatar.rotate_sprite_clockwise();
-                        self.avatar.rotate_sprite_clockwise();
                         self.avatar.draw()
                     }
                     VirtualKeyCode::Q => {
-                        self.avatar.rotate_sprite_clockwise();
                         let mut commands = vec![Command::Rotate {
                             center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0),
                             yaw: PI / 4.0,
@@ -224,7 +219,6 @@ impl EventHandler for TerrainHandler {
                         commands
                     }
                     VirtualKeyCode::E => {
-                        self.avatar.rotate_sprite_anticlockwise();
                         let mut commands = vec![Command::Rotate {
                             center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0),
                             yaw: -PI / 4.0,
