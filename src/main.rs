@@ -4,18 +4,16 @@ extern crate nalgebra as na;
 mod world;
 mod world_artist;
 mod avatar;
+mod label_editor;
 
 use world::*;
 use world_artist::*;
 use avatar::*;
+use label_editor::*;
 
 use isometric::coords::*;
-use isometric::drawing::Text;
-use isometric::event_handlers::*;
 use isometric::terrain::*;
 use isometric::EventHandler;
-use isometric::Font;
-use isometric::Texture;
 use isometric::v2;
 use isometric::{Command, Event, IsometricEngine};
 use isometric::{ElementState, VirtualKeyCode};
@@ -79,8 +77,7 @@ pub struct TerrainHandler {
     world: World,
     world_artist: WorldArtist,
     world_coord: Option<WorldCoord>,
-    font: Arc<Font>,
-    label_editor: Option<LabelEditor>,
+    label_editor: LabelEditor,
     event_handlers: Vec<Box<EventHandler>>,
     avatar: Avatar,
 }
@@ -99,13 +96,8 @@ impl TerrainHandler {
             world_artist,
             world_coord: None,
             heights, //TODO remove
-            font: Arc::new(Font::from_csv_and_texture(
-                "serif.csv",
-                Texture::new(image::open("serif.png").unwrap()),
-            )),
-            label_editor: None,
+            label_editor: LabelEditor::new(),
             event_handlers: vec![
-                // Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
             avatar: Avatar::new(0.00078125, 0.53333333),
@@ -115,29 +107,9 @@ impl TerrainHandler {
 
 impl EventHandler for TerrainHandler {
     fn handle_event(&mut self, event: Arc<Event>) -> Vec<Command> {
-        if let Some(label_editor) = &mut self.label_editor {
-            match *event {
-                Event::Key {
-                    key: VirtualKeyCode::Return,
-                    state: ElementState::Pressed,
-                    ..
-                } => {
-                    self.label_editor = None;
-                    vec![]
-                }
-                _ => {
-                    label_editor.text_editor.handle_event(event.clone());
-                    let name = format!("{:?}", label_editor.world_coord);
-                    vec![Command::Draw {
-                        name,
-                        drawing: Box::new(Text::new(
-                            &label_editor.text_editor.text(),
-                            label_editor.world_coord,
-                            self.font.clone(),
-                        )),
-                    }]
-                }
-            }
+        let label_commands = self.label_editor.handle_event(event.clone());
+        if !label_commands.is_empty() {
+            label_commands
         } else {
             let mut out = vec![];
             let event_handlers = &mut self.event_handlers;
@@ -178,20 +150,16 @@ impl EventHandler for TerrainHandler {
                     }
                 }
                 Event::Key {
-                    key: VirtualKeyCode::L,
-                    state: ElementState::Pressed,
-                    ..
-                } => {
-                    if let Some(world_coord) = self.avatar.position() {
-                        self.label_editor = Some(LabelEditor::new(world_coord, &self.heights));
-                    };
-                    vec![]
-                }
-                Event::Key {
                     key,
                     state: ElementState::Pressed,
                     ..
                 } => match key {
+                    VirtualKeyCode::L => {
+                        if let Some(world_coord) = self.avatar.position() {
+                            self.label_editor.start_edit(world_coord, &self.heights);
+                        }
+                        vec![]
+                    }
                     VirtualKeyCode::H => {
                         self.avatar.reposition(self.world_coord, &self.heights);
                         self.avatar.draw()
@@ -229,25 +197,6 @@ impl EventHandler for TerrainHandler {
                 _ => vec![],
             });
             out
-        }
-    }
-}
-
-struct LabelEditor {
-    world_coord: WorldCoord,
-    text_editor: TextEditor,
-}
-
-impl LabelEditor {
-    fn new(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> LabelEditor {
-        let x = world_coord.x.floor();
-        let y = world_coord.y.floor();
-        let z = heights[(x as usize, y as usize)];
-        let world_coord = WorldCoord::new(x, y, z);
-
-        LabelEditor {
-            world_coord,
-            text_editor: TextEditor::new(),
         }
     }
 }
