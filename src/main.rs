@@ -108,7 +108,7 @@ impl TerrainHandler {
                 // Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            avatar: Avatar::new(),
+            avatar: Avatar::new(0.0125, 0.53333333),
         }
     }
 }
@@ -202,11 +202,9 @@ impl EventHandler for TerrainHandler {
                     }
                     VirtualKeyCode::A => {
                         self.avatar.rotate_anticlockwise();
-                        self.avatar.rotate_anticlockwise();
                         self.avatar.draw()
                     }
                     VirtualKeyCode::D => {
-                        self.avatar.rotate_clockwise();
                         self.avatar.rotate_clockwise();
                         self.avatar.draw()
                     }

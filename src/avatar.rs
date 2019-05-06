@@ -1,3 +1,4 @@
+use isometric::{M, v3, V3};
 use isometric::coords::*;
 use isometric::drawing::Billboard;
 use isometric::Command;
@@ -7,57 +8,43 @@ use std::f32::consts::PI;
 
 enum Rotation {
     Left,
-    UpLeft,
     Up,
-    UpRight,
     Right,
-    DownRight,
     Down,
-    DownLeft,
 }
 
 impl Rotation {
     fn clockwise(&self) -> Rotation {
         match self {
-            Rotation::Left => Rotation::UpLeft,
-            Rotation::UpLeft => Rotation::Up,
-            Rotation::Up => Rotation::UpRight,
-            Rotation::UpRight => Rotation::Right,
-            Rotation::Right => Rotation::DownRight,
-            Rotation::DownRight => Rotation::Down,
-            Rotation::Down => Rotation::DownLeft,
-            Rotation::DownLeft => Rotation::Left,
+            Rotation::Left => Rotation::Up,
+            Rotation::Up => Rotation::Right,
+            Rotation::Right => Rotation::Down,
+            Rotation::Down => Rotation::Left,
         }
     }
 
     fn anticlockwise(&self) -> Rotation {
         match self {
-            Rotation::Left => Rotation::DownLeft,
-            Rotation::UpLeft => Rotation::Left,
-            Rotation::Up => Rotation::UpLeft,
-            Rotation::UpRight => Rotation::Up,
-            Rotation::Right => Rotation::UpRight,
-            Rotation::DownRight => Rotation::Right,
-            Rotation::Down => Rotation::DownRight,
-            Rotation::DownLeft => Rotation::Down,
+            Rotation::Left => Rotation::Down,
+            Rotation::Up => Rotation::Left,
+            Rotation::Right => Rotation::Up,
+            Rotation::Down => Rotation::Right,
         }
     }
 
     fn angle(&self) -> f32 {
         match self {
             Rotation::Left => 0.0 * (PI / 4.0),
-            Rotation::UpLeft => 1.0 * (PI / 4.0),
             Rotation::Up => 2.0 * (PI / 4.0),
-            Rotation::UpRight => 3.0 * (PI / 4.0),
             Rotation::Right => 4.0 * (PI / 4.0),
-            Rotation::DownRight => 5.0 * (PI / 4.0),
             Rotation::Down => 6.0 * (PI / 4.0),
-            Rotation::DownLeft => 7.0 * (PI / 4.0),
         }
     }
 }
 
 pub struct Avatar {
+    scale: f32,
+    max_grade: f32,
     rotation: Rotation,
     position: Option<WorldCoord>,
     texture_body: Arc<Texture>,
@@ -67,11 +54,13 @@ pub struct Avatar {
 }
 
 impl Avatar {
-    pub fn new() -> Avatar {
+    pub fn new(scale: f32, max_grade: f32) -> Avatar {
         Avatar {
+            max_grade,
+            scale,
             rotation: Rotation::Up,
             position: None,
-            texture_body: Arc::new(Texture::new(image::open("torso.png").unwrap())),
+            texture_body: Arc::new(Texture::new(image::open("body.png").unwrap())),
             texture_head: Arc::new(Texture::new(image::open("head.png").unwrap())),
             texture_eye: Arc::new(Texture::new(image::open("eye.png").unwrap())),
             texture_hand: Arc::new(Texture::new(image::open("hand.png").unwrap())),
@@ -90,20 +79,20 @@ impl Avatar {
         self.rotation = self.rotation.anticlockwise();
     }
 
-    pub fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &na::DMatrix<f32>) {
+    pub fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &M<f32>) {
         if let Some(world_coord) = world_coord {
             self.position = Some(Avatar::snap(world_coord, heights));
         }
     }
 
-    fn snap(world_coord: WorldCoord, heights: &na::DMatrix<f32>) -> WorldCoord {
+    fn snap(world_coord: WorldCoord, heights: &M<f32>) -> WorldCoord {
         let x = world_coord.x.floor();
         let y = world_coord.y.floor();
         let z = heights[(x as usize, y as usize)] + 0.1;
         WorldCoord::new(x, y, z)
     }
 
-    pub fn walk(&mut self, heights: &na::DMatrix<f32>) {
+    pub fn walk(&mut self, heights: &M<f32>) {
         if let Some(position) = self.position {
             let new_position = match self.rotation {
                 Rotation::Left => WorldCoord::new(position.x + 1.0, position.y, 0.0),
@@ -113,85 +102,51 @@ impl Avatar {
                 _ => position,
             };
             let new_position = Avatar::snap(new_position, heights);
-            if (new_position.z - position.z).abs() < 0.533333333 {
+            if (new_position.z - position.z).abs() < self.max_grade {
                 self.position = Some(new_position);
             }
         }
     }
 
+    #[rustfmt::skip]
+    pub fn get_rotation_matrix(&self) -> na::Matrix3<f32> {
+        let cos = self.rotation.angle().cos();
+        let sin = self.rotation.angle().sin();
+        na::Matrix3::from_vec(vec![
+            cos, sin, 0.0,
+            -sin, cos, 0.0,
+            0.0, 0.0, 1.0,
+        ])
+    }
+
+    pub fn draw_billboard_at_offset(&self, position: WorldCoord, offset: V3<f32>, handle: &str, texture: &Arc<Texture>) -> Command {
+        let offset = self.get_rotation_matrix() * offset * self.scale;
+        let position = WorldCoord::new(position.x + offset.x, position.y + offset.y, position.z + offset.z);
+        let width = (texture.width() as f32) * self.scale;
+        let height = (texture.height() as f32) * self.scale;
+        Command::Draw {
+            name: handle.to_string(),
+            drawing: Box::new(Billboard::new(
+                position,
+                width,
+                height,
+                texture.clone(),
+            )),
+        }
+
+    }
+
     pub fn draw(&self) -> Vec<Command> {
         if let Some(position) = self.position {
-            let draw_body = Command::Draw {
-                name: "body".to_string(),
-                drawing: Box::new(Billboard::new(
-                    position,
-                    0.1,
-                    0.2,
-                    self.texture_body.clone(),
-                )),
-            };
-            let angle = self.rotation.angle();
-            let x_offset = angle.cos() * 0.02;
-            let y_offset = angle.sin() * 0.02;
-            let head_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
-            let draw_head = Command::Draw {
-                name: "head".to_string(),
-                drawing: Box::new(Billboard::new(
-                    head_position,
-                    0.1,
-                    0.2,
-                    self.texture_head.clone(),
-                )),
-            };
-            let x_offset = angle.cos() * 0.06 - angle.sin() * 0.019;
-            let y_offset = angle.cos() * 0.019 + angle.sin() * 0.06;
-            let left_eye_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
-            let draw_left_eye = Command::Draw {
-                name: "left_eye".to_string(),
-                drawing: Box::new(Billboard::new(
-                    left_eye_position,
-                    0.0125,
-                    0.2,
-                    self.texture_eye.clone(),
-                )),
-            };
-            let x_offset = angle.cos() * 0.06 + angle.sin() * 0.019;
-            let y_offset = - angle.cos() * 0.019 + angle.sin() * 0.06;
-            let right_eye_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
-            let draw_right_eye = Command::Draw {
-                name: "right_eye".to_string(),
-                drawing: Box::new(Billboard::new(
-                    right_eye_position,
-                    0.0125,
-                    0.2,
-                    self.texture_eye.clone(),
-                )),
-            };
-            let x_offset = angle.cos() * 0.035 - angle.sin() * 0.035;
-            let y_offset = angle.cos() * 0.035 + angle.sin() * 0.035;
-            let left_hand_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
-            let draw_left_hand = Command::Draw {
-                name: "left_hand".to_string(),
-                drawing: Box::new(Billboard::new(
-                    left_hand_position,
-                    0.1,
-                    0.2,
-                    self.texture_hand.clone(),
-                )),
-            };
-            let x_offset = angle.cos() * 0.035 + angle.sin() * 0.035;
-            let y_offset = -angle.cos() * 0.035 + angle.sin() * 0.035;
-            let right_hand_position = WorldCoord::new(position.x + x_offset, position.y + y_offset, position.z);
-            let draw_right_hand = Command::Draw {
-                name: "right_hand".to_string(),
-                drawing: Box::new(Billboard::new(
-                    right_hand_position,
-                    0.1,
-                    0.2,
-                    self.texture_hand.clone(),
-                )),
-            };
-            vec![draw_body, draw_head, draw_left_eye, draw_right_eye, draw_left_hand, draw_right_hand, Command::LookAt(position)]
+            vec![
+                self.draw_billboard_at_offset(position, v3(0.0, 0.0, 0.0), "body", &self.texture_body),
+                self.draw_billboard_at_offset(position, v3(1.0, 0.0, 0.0), "head", &self.texture_head),
+                self.draw_billboard_at_offset(position, v3(4.8, 1.52, 0.0), "left_eye", &self.texture_eye),
+                self.draw_billboard_at_offset(position, v3(4.8, -1.52, 0.0), "right_eye", &self.texture_eye),
+                self.draw_billboard_at_offset(position, v3(2.8, 2.8, 0.0), "left_hand", &self.texture_hand),
+                self.draw_billboard_at_offset(position, v3(2.8, -2.8, 0.0), "right_hand", &self.texture_hand),
+                Command::LookAt(position),
+            ]
         } else {
             vec![]
         }
