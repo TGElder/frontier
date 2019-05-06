@@ -1,8 +1,8 @@
-use super::avatar::*;
-use super::house_builder::*;
-use super::label_editor::*;
-use super::world::*;
-use super::world_artist::*;
+use crate::avatar::*;
+use crate::house_builder::*;
+use crate::label_editor::*;
+use crate::world::*;
+use crate::world_artist::*;
 
 use isometric::coords::*;
 use isometric::terrain::*;

@@ -1,4 +1,4 @@
-use super::world::World;
+use crate::world::World;
 use pioneer::erosion::Erosion;
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;

@@ -1,4 +1,4 @@
-use super::world::World;
+use crate::world::World;
 use isometric::coords::*;
 use isometric::drawing::Billboard;
 use isometric::Command;

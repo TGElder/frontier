@@ -1,4 +1,4 @@
-use super::world::World;
+use crate::world::World;
 use isometric::drawing::*;
 use isometric::terrain::*;
 use isometric::*;
@@ -138,7 +138,7 @@ impl WorldArtist {
         let road_color = &Color::new(0.5, 0.5, 0.5, 1.0);
         let river_edges = world
             .rivers()
-            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y); //TODO can we avoid the repeated ranges here?
         let road_edges = world
             .roads()
             .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
