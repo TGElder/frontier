@@ -1,70 +1,44 @@
 use isometric::coords::WorldCoord;
 use isometric::drawing::HouseDrawing;
 use isometric::Color;
-use isometric::EventHandler;
-use isometric::{Command, Event};
-use std::sync::Arc;
-
-use isometric::{ElementState, VirtualKeyCode};
-
-const LAYER_NAME: &str = "house";
+use isometric::Command;
+use isometric::{M, V3};
 
 pub struct HouseBuilder {
-    houses: usize,
-    world_coordinate: Option<WorldCoord>,
-    light_direction: na::Vector3<f32>,
+    houses: M<bool>,
+    light_direction: V3<f32>,
+    color: Color,
 }
 
 impl HouseBuilder {
-    pub fn new(light_direction: na::Vector3<f32>) -> HouseBuilder {
+    pub fn new(width: usize, height: usize, light_direction: V3<f32>) -> HouseBuilder {
         HouseBuilder {
-            houses: 0,
-            world_coordinate: None,
+            houses: M::from_element(width, height, false),
             light_direction,
+            color: Color::new(1.0, 0.0, 0.0, 1.0),
         }
     }
 
-    fn draw(&mut self) -> Vec<Command> {
-        if let Some(world_coordinate) = self.world_coordinate {
-            let world_coordinate = WorldCoord::new(
-                world_coordinate.x.floor() + 0.5,
-                world_coordinate.y.floor() + 0.5,
-                world_coordinate.z,
-            );
-            let color = Color::new(1.0, 0.0, 0.0, 1.0);
+    pub fn build_house(&mut self, world_coord: WorldCoord) -> Vec<Command> {
+        let index = (world_coord.x as usize, world_coord.y as usize);
+        self.houses[index] = !self.houses[index];
+        let name = format!("house-{:?}", index);
+        if self.houses[index] {
+
             let drawing = HouseDrawing::new(
-                world_coordinate,
+                world_coord,
                 0.25,
                 0.5,
                 0.5,
-                color,
+                self.color,
                 self.light_direction,
             );
-            let name = LAYER_NAME.to_string() + &self.houses.to_string();
-            self.houses += 1;
             vec![Command::Draw {
                 name,
                 drawing: Box::new(drawing),
             }]
         } else {
-            vec![]
-        }
-    }
-}
-
-impl EventHandler for HouseBuilder {
-    fn handle_event(&mut self, event: Arc<Event>) -> Vec<Command> {
-        match *event {
-            Event::WorldPositionChanged(world_coordinate) => {
-                self.world_coordinate = Some(world_coordinate);
-                vec![]
-            }
-            Event::Key {
-                key: VirtualKeyCode::B,
-                state: ElementState::Pressed,
-                ..
-            } => self.draw(),
-            _ => vec![],
+            vec![Command::Erase(name)]
         }
     }
 }

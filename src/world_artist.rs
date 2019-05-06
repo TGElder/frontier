@@ -33,22 +33,22 @@ pub struct WorldArtist {
 
 impl WorldArtist {
 
-    pub fn new(world: &World, slab_size: usize, cliff_gradient: f32) -> WorldArtist {
+    pub fn new(world: &World, slab_size: usize, cliff_gradient: f32, light_direction: V3<f32>) -> WorldArtist {
         let (width, height) = world.terrain().elevations().shape();
         WorldArtist{
             width,
             height,
             drawing: TerrainDrawing::new(width, height, slab_size),
             colors: WorldArtist::get_colors(world, cliff_gradient),
-            shading: WorldArtist::get_shading(),
+            shading: WorldArtist::get_shading(light_direction),
             slab_size
         }
     }
 
-    fn get_shading() -> Box<SquareColoring> {
+    fn get_shading(light_direction: V3<f32>) -> Box<SquareColoring> {
         Box::new(AngleSquareColoring::new(
             Color::new(1.0, 1.0, 1.0, 1.0),
-            v3(1.0, 0.0, 1.0),
+            light_direction,
         ))
     }
 

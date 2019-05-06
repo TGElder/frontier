@@ -162,6 +162,8 @@ impl RoadSet {
 }
 
 pub struct World {
+    width: usize,
+    height: usize,
     terrain: Terrain,
     rivers: RoadSet,
     roads: RoadSet,
@@ -178,12 +180,22 @@ impl World {
         let max_height = elevations.max();
         let rivers = World::setup_rivers(width, height, river_nodes, rivers);
         World{
+            width,
+            height,
             terrain: Terrain::new(elevations, &rivers.get_nodes(0..width, 0..height), &rivers.get_edges(0..width, 0..height)),
             rivers,
             roads: RoadSet::new(width, height, World::ROAD_WIDTH),
             sea_level,
             max_height,
         }
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
     }
 
     pub fn terrain(&self) -> &Terrain {
@@ -265,6 +277,18 @@ impl World {
         let y = world_coord.y.round();
         let z = self.terrain.elevations()[(x as usize, y as usize)];
         WorldCoord::new(x, y, z)
+    }
+
+    pub fn snap_middle(&self, world_coord: WorldCoord) -> WorldCoord {
+        let x = world_coord.x.floor();
+        let y = world_coord.y.floor();
+        let mut z = 0.0 as f32;
+        for dx in 0..2 {
+            for dy in 0..2 {
+                z = z.max(self.terrain.elevations()[(x as usize + dx, y as usize + dy)])
+            }
+        }
+        WorldCoord::new(x + 0.5, y + 0.5, z)
     }
 
 }
@@ -558,9 +582,14 @@ mod world_tests {
     
     use super::*;
 
+    #[rustfmt::skip]
     fn world() -> World {
         World::new(
-            M::from_element(3, 3, 1.0),
+            M::from_vec(3, 3, vec![
+                1.0, 1.0, 1.0,
+                1.0, 2.0, 1.0,
+                1.0, 1.0, 1.0,
+            ]),
             vec![
                 Node::new(v2(1, 0), 0.1, 0.0),
                 Node::new(v2(1, 1), 0.2, 0.0),
@@ -676,6 +705,14 @@ mod world_tests {
         assert_eq!(
             world().snap(WorldCoord::new(0.3, 1.7, 1.2)),
             WorldCoord::new(0.0, 2.0, 1.0)
+        );
+    }
+
+      #[test]
+    fn test_snap_middle() {
+        assert_eq!(
+            world().snap_middle(WorldCoord::new(0.3, 1.7, 1.2)),
+            WorldCoord::new(0.5, 1.5, 2.0)
         );
     }
 }
