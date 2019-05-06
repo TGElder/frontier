@@ -22,7 +22,6 @@ impl Slab {
     }
 }
 
-
 pub struct WorldArtist {
     width: usize,
     height: usize,
@@ -34,13 +33,13 @@ pub struct WorldArtist {
 
 impl WorldArtist {
 
-    pub fn new(world: &World, slab_size: usize) -> WorldArtist {
+    pub fn new(world: &World, slab_size: usize, cliff_gradient: f32) -> WorldArtist {
         let (width, height) = world.terrain().elevations().shape();
         WorldArtist{
             width,
             height,
             drawing: TerrainDrawing::new(width, height, slab_size),
-            colors: WorldArtist::get_colors(world),
+            colors: WorldArtist::get_colors(world, cliff_gradient),
             shading: WorldArtist::get_shading(),
             slab_size
         }
@@ -53,11 +52,10 @@ impl WorldArtist {
         ))
     }
 
-    fn get_colors(world: &World) -> M<Color> {
+    fn get_colors(world: &World, cliff_gradient: f32) -> M<Color> {
         let elevations = world.terrain().elevations();
         let sea_level = world.sea_level();
-        let width = (elevations.shape().0) - 1;
-        let height = (elevations.shape().1) - 1;
+        let (width, height) = elevations.shape();
         let grass = Color::new(0.0, 0.75, 0.0, 1.0);
         let rock = Color::new(0.5, 0.4, 0.3, 1.0);
         let beach = Color::new(1.0, 1.0, 0.0, 1.0);
@@ -65,10 +63,10 @@ impl WorldArtist {
         let mut colors: M<Color> = M::from_element(width, height, grass);
         for x in 0..elevations.shape().0 - 1 {
             for y in 0..elevations.shape().1 - 1 {
-                if (elevations[(x, y)] - elevations[(x + 1, y)]).abs() > 0.533333333
-                    || (elevations[(x + 1, y)] - elevations[(x + 1, y + 1)]).abs() > 0.533333333
-                    || (elevations[(x + 1, y + 1)] - elevations[(x, y + 1)]).abs() > 0.533333333
-                    || (elevations[(x, y + 1)] - elevations[(x, y)]).abs() > 0.533333333
+                if (elevations[(x, y)] - elevations[(x + 1, y)]).abs() > cliff_gradient
+                    || (elevations[(x + 1, y)] - elevations[(x + 1, y + 1)]).abs() > cliff_gradient
+                    || (elevations[(x + 1, y + 1)] - elevations[(x, y + 1)]).abs() > cliff_gradient
+                    || (elevations[(x, y + 1)] - elevations[(x, y)]).abs() > cliff_gradient
                 {
                     colors[(x, y)] = rock;
                 } else if elevations[(x, y)] < beach_level

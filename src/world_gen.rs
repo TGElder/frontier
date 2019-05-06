@@ -12,13 +12,14 @@ pub fn generate_world(size: usize, seed: u8) -> World {
     mesh.set_z(0, 0, MAX);
     let mut rng = Box::new(SmallRng::from_seed([seed; 16]));
 
+    println!("Generating world...");
     for i in 0..size {
         mesh = MeshSplitter::split(&mesh, &mut rng, (0.0, 0.75));
         if i < 9 {
             let threshold = i * 2;
             mesh = Erosion::erode(mesh, &mut rng, threshold as u32, 16);
         }
-        println!("Generating world {}", size - i);
+        println!("{}", size - i);
     }
 
     let max_height = (2.0 as f64).powf(size as f64) / 16.0;

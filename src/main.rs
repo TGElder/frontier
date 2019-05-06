@@ -48,7 +48,8 @@ impl TerrainHandler {
     pub fn new(
         world: World,
     ) -> TerrainHandler {
-        let world_artist = WorldArtist::new(&world, 64); 
+        let cliff_gradient = 0.53;
+        let world_artist = WorldArtist::new(&world, 64, cliff_gradient); 
         TerrainHandler {
             world,
             world_artist,
@@ -57,8 +58,38 @@ impl TerrainHandler {
             event_handlers: vec![
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            avatar: Avatar::new(0.00078125, 0.53333333),
+            avatar: Avatar::new(0.00078125, cliff_gradient),
         }
+    }
+}
+
+impl TerrainHandler {
+    fn build_road(&mut self) -> Vec<Command> {
+        let from = self.avatar.position();
+        self.avatar.walk(&self.world);
+        let to = self.avatar.position();
+        match (from, to) {
+            (Some(from), Some(to)) if from != to => {
+                let from = v2(from.x as usize, from.y as usize);
+                let to = v2(to.x as usize, to.y as usize);
+
+                let edge = Edge::new(from, to);
+                self.world.toggle_road(&edge);
+                let mut commands = self.world_artist.draw_affected(&self.world, vec![from, to]);
+                commands.append(&mut self.avatar.draw());
+                commands
+            },
+            _ => vec![]
+        }
+    }
+
+    fn rotate(&self, yaw: f32) -> Vec<Command> {
+        let mut commands = vec![Command::Rotate {
+            center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0),
+            yaw,
+        }];
+        commands.append(&mut self.avatar.draw());
+        commands
     }
 }
 
@@ -80,37 +111,11 @@ impl EventHandler for TerrainHandler {
                     vec![]
                 },
                 Event::Key {
-                    key: VirtualKeyCode::R,
-                    state: ElementState::Pressed,
-                    ..
-                } => {
-                    if let Some(from) = self.avatar.position() {
-                        self.avatar.walk(&self.world);
-                        if let Some(to) = self.avatar.position() {
-                            if from != to {
-                                let from = v2(from.x as usize, from.y as usize);
-                                let to = v2(to.x as usize, to.y as usize);
-
-                                let edge = Edge::new(from, to);
-                                self.world.toggle_road(&edge);
-                                let mut commands = self.world_artist.draw_affected(&self.world, vec![from, to]);
-                                commands.append(&mut self.avatar.draw());
-                                commands
-                            } else {
-                                vec![]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    } else {
-                        vec![]
-                    }
-                }
-                Event::Key {
                     key,
                     state: ElementState::Pressed,
                     ..
                 } => match key {
+                    VirtualKeyCode::R => self.build_road(),
                     VirtualKeyCode::L => {
                         if let Some(world_coord) = self.avatar.position() {
                             self.label_editor.start_edit(world_coord);
@@ -133,22 +138,8 @@ impl EventHandler for TerrainHandler {
                         self.avatar.rotate_clockwise();
                         self.avatar.draw()
                     }
-                    VirtualKeyCode::Q => {
-                        let mut commands = vec![Command::Rotate {
-                            center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0),
-                            yaw: PI / 4.0,
-                        }];
-                        commands.append(&mut self.avatar.draw());
-                        commands
-                    }
-                    VirtualKeyCode::E => {
-                        let mut commands = vec![Command::Rotate {
-                            center: GLCoord4D::new(0.0, 0.0, 0.0, 1.0),
-                            yaw: -PI / 4.0,
-                        }];
-                        commands.append(&mut self.avatar.draw());
-                        commands
-                    }
+                    VirtualKeyCode::Q => self.rotate(PI / 4.0),
+                    VirtualKeyCode::E => self.rotate(-PI / 4.0),
                     _ => vec![],
                 },
                 _ => vec![],

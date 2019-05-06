@@ -86,7 +86,6 @@ impl Avatar {
         }
     }
 
-
     pub fn walk(&mut self, world: &World) {
         if let Some(position) = self.position {
             let new_position = match self.rotation {
