@@ -1,3 +1,4 @@
+use crate::utils::float_ordering;
 use isometric::coords::WorldCoord;
 use isometric::terrain::*;
 use isometric::*;
@@ -312,6 +313,54 @@ impl World {
             }
         }
         WorldCoord::new(x + 0.5, y + 0.5, z)
+    }
+
+    pub fn get_corners(&self, position: &V2<usize>) -> [V2<usize>; 4] {
+        [
+            *position,
+            v2(position.x + 1, position.y),
+            v2(position.x + 1, position.y + 1),
+            v2(position.x, position.y + 1),
+        ]
+    }
+
+    pub fn get_border(&self, position: &V2<usize>) -> Vec<Edge> {
+        let corners = self.get_corners(position);
+        (0..4)
+            .map(|i| Edge::new(corners[i], corners[(i + 1) % 4]))
+            .collect()
+    }
+
+    pub fn get_elevation(&self, position: &V2<usize>) -> f32 {
+        self.terrain.elevations()[(position.x, position.y)]
+    }
+
+    pub fn get_rise(&self, edge: &Edge) -> f32 {
+        self.get_elevation(edge.to()) - self.get_elevation(edge.from())
+    }
+
+    pub fn get_lowest_corner(&self, position: &V2<usize>) -> f32 {
+        self.get_corners(&position)
+            .iter()
+            .map(|corner| self.get_elevation(corner))
+            .min_by(float_ordering)
+            .unwrap()
+    }
+
+    pub fn get_highest_corner(&self, position: &V2<usize>) -> f32 {
+        self.get_corners(&position)
+            .iter()
+            .map(|corner| self.get_elevation(corner))
+            .max_by(float_ordering)
+            .unwrap()
+    }
+
+    pub fn get_max_abs_rise(&self, position: &V2<usize>) -> f32 {
+        self.get_border(&position)
+            .iter()
+            .map(|edge| self.get_rise(edge).abs())
+            .max_by(float_ordering)
+            .unwrap()
     }
 }
 
@@ -894,5 +943,53 @@ mod world_tests {
             world().snap_middle(WorldCoord::new(0.3, 1.7, 1.2)),
             WorldCoord::new(0.5, 1.5, 2.0)
         );
+    }
+
+    #[test]
+    fn test_get_corners() {
+        assert_eq!(
+            world().get_corners(&v2(0, 0)),
+            [v2(0, 0), v2(1, 0), v2(1, 1), v2(0, 1)]
+        );
+    }
+
+    #[test]
+    fn test_get_border() {
+        assert_eq!(
+            world().get_border(&v2(0, 0)),
+            vec![
+                Edge::new(v2(0, 0), v2(1, 0)),
+                Edge::new(v2(1, 0), v2(1, 1)),
+                Edge::new(v2(1, 1), v2(0, 1)),
+                Edge::new(v2(0, 1), v2(0, 0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_elevation() {
+        assert_eq!(world().get_elevation(&v2(1, 1)), 2.0);
+    }
+
+    #[test]
+    fn test_get_rise() {
+        assert_eq!(world().get_rise(&Edge::new(v2(1, 0), v2(1, 1))), 1.0);
+        assert_eq!(world().get_rise(&Edge::new(v2(1, 1), v2(2, 1))), -1.0);
+        assert_eq!(world().get_rise(&Edge::new(v2(0, 0), v2(1, 0))), 0.0);
+    }
+
+    #[test]
+    fn test_get_lowest_corner() {
+        assert_eq!(world().get_lowest_corner(&v2(0, 0)), 1.0);
+    }
+
+    #[test]
+    fn test_get_highest_corner() {
+        assert_eq!(world().get_highest_corner(&v2(0, 0)), 2.0);
+    }
+
+    #[test]
+    fn test_get_max_abs_rise() {
+        assert_eq!(world().get_max_abs_rise(&v2(0, 0)), 1.0);
     }
 }

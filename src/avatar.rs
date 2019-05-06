@@ -88,12 +88,11 @@ impl Avatar {
 
     pub fn walk(&mut self, world: &World) {
         if let Some(position) = self.position {
-            let new_position = match self.rotation {
-                Rotation::Left => WorldCoord::new(position.x + 1.0, position.y, 0.0),
-                Rotation::Up => WorldCoord::new(position.x, position.y + 1.0, 0.0),
-                Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
-                Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
-            };
+            let new_position = WorldCoord::new(
+                position.x + self.rotation.angle().cos(),
+                position.y + self.rotation.angle().sin(),
+                0.0,
+            );
             let new_position = world.snap(new_position);
             if (new_position.z - position.z).abs() < self.max_grade {
                 self.position = Some(new_position);

@@ -8,6 +8,7 @@ mod avatar;
 mod game_handler;
 mod house_builder;
 mod label_editor;
+mod utils;
 mod world;
 mod world_artist;
 mod world_gen;

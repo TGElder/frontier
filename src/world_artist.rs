@@ -36,6 +36,7 @@ impl WorldArtist {
         world: &World,
         slab_size: usize,
         cliff_gradient: f32,
+        beach_level: f32,
         light_direction: V3<f32>,
     ) -> WorldArtist {
         let (width, height) = world.terrain().elevations().shape();
@@ -43,7 +44,7 @@ impl WorldArtist {
             width,
             height,
             drawing: TerrainDrawing::new(width, height, slab_size),
-            colors: WorldArtist::get_colors(world, cliff_gradient),
+            colors: WorldArtist::get_colors(world, cliff_gradient, beach_level),
             shading: WorldArtist::get_shading(light_direction),
             slab_size,
         }
@@ -56,33 +57,28 @@ impl WorldArtist {
         ))
     }
 
-    fn get_colors(world: &World, cliff_gradient: f32) -> M<Color> {
-        let elevations = world.terrain().elevations();
-        let sea_level = world.sea_level();
-        let (width, height) = elevations.shape();
-        let grass = Color::new(0.0, 0.75, 0.0, 1.0);
-        let rock = Color::new(0.5, 0.4, 0.3, 1.0);
-        let beach = Color::new(1.0, 1.0, 0.0, 1.0);
-        let beach_level = sea_level + 0.05;
-        let mut colors: M<Color> = M::from_element(width, height, grass);
-        for x in 0..elevations.shape().0 - 1 {
-            for y in 0..elevations.shape().1 - 1 {
-                if (elevations[(x, y)] - elevations[(x + 1, y)]).abs() > cliff_gradient
-                    || (elevations[(x + 1, y)] - elevations[(x + 1, y + 1)]).abs() > cliff_gradient
-                    || (elevations[(x + 1, y + 1)] - elevations[(x, y + 1)]).abs() > cliff_gradient
-                    || (elevations[(x, y + 1)] - elevations[(x, y)]).abs() > cliff_gradient
-                {
-                    colors[(x, y)] = rock;
-                } else if elevations[(x, y)] < beach_level
-                    && elevations[(x + 1, y)] < beach_level
-                    && elevations[(x + 1, y + 1)] < beach_level
-                    && elevations[(x, y + 1)] < beach_level
-                {
-                    colors[(x, y)] = beach;
-                }
-            }
+    fn get_colors(world: &World, cliff_gradient: f32, beach_level: f32) -> M<Color> {
+        let (width, height) = world.terrain().elevations().shape();
+        M::from_fn(width - 1, height - 1, |x, y| {
+            WorldArtist::get_color(world, &v2(x, y), cliff_gradient, beach_level)
+        })
+    }
+
+    fn get_color(
+        world: &World,
+        position: &V2<usize>,
+        cliff_gradient: f32,
+        beach_level: f32,
+    ) -> Color {
+        let max_gradient = world.get_max_abs_rise(&position);
+        let min_elevation = world.get_lowest_corner(&position);
+        if max_gradient > cliff_gradient {
+            Color::new(0.5, 0.4, 0.3, 1.0)
+        } else if min_elevation < beach_level {
+            Color::new(1.0, 1.0, 0.0, 1.0)
+        } else {
+            Color::new(0.0, 0.75, 0.0, 1.0)
         }
-        colors
     }
 
     pub fn draw_terrain(&self) -> Command {
@@ -105,9 +101,7 @@ impl WorldArtist {
 
     fn draw_slab(&mut self, world: &World, slab: &Slab) -> Vec<Command> {
         self.draw_slab_tiles(world, slab);
-        let mut out = vec![];
-        out.append(&mut self.draw_slab_rivers_roads(world, &slab));
-        out
+        self.draw_slab_rivers_roads(world, &slab)
     }
 
     fn draw_slab_tiles(&mut self, world: &World, slab: &Slab) {

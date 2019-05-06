@@ -26,8 +26,10 @@ pub struct GameHandler {
 impl GameHandler {
     pub fn new(world: World) -> GameHandler {
         let cliff_gradient = 0.53;
+        let beach_level = world.sea_level() + 0.05;
         let light_direction = V3::new(-1.0, 0.0, 1.0);
-        let world_artist = WorldArtist::new(&world, 64, cliff_gradient, light_direction);
+        let world_artist =
+            WorldArtist::new(&world, 64, cliff_gradient, beach_level, light_direction);
         GameHandler {
             house_builder: HouseBuilder::new(world.width(), world.height(), light_direction),
             world,
