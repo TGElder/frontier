@@ -166,6 +166,7 @@ pub struct World {
     rivers: RoadSet,
     roads: RoadSet,
     sea_level: f32,
+    max_height: f32,
 }
 
 impl World {
@@ -174,12 +175,14 @@ impl World {
     
     pub fn new(elevations: M<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> World {
         let (width, height) = elevations.shape();
+        let max_height = elevations.max();
         let rivers = World::setup_rivers(width, height, river_nodes, rivers);
         World{
             terrain: Terrain::new(elevations, &rivers.get_nodes(0..width, 0..height), &rivers.get_edges(0..width, 0..height)),
             rivers,
             roads: RoadSet::new(width, height, World::ROAD_WIDTH),
-            sea_level
+            sea_level,
+            max_height,
         }
     }
 
@@ -197,6 +200,10 @@ impl World {
 
     pub fn sea_level(&self) -> f32 {
         self.sea_level
+    }
+
+    pub fn max_height(&self) -> f32 {
+        self.max_height
     }
 
     fn setup_rivers(width: usize, height: usize, river_nodes: Vec<Node>, rivers: Vec<Edge>) -> RoadSet {
