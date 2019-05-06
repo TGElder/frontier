@@ -108,7 +108,7 @@ impl TerrainHandler {
                 // Box::new(RotateHandler::new(VirtualKeyCode::E, VirtualKeyCode::Q)),
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
             ],
-            avatar: Avatar::new(0.0125, 0.53333333),
+            avatar: Avatar::new(0.00078125, 0.53333333),
         }
     }
 }

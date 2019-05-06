@@ -88,7 +88,7 @@ impl Avatar {
     fn snap(world_coord: WorldCoord, heights: &M<f32>) -> WorldCoord {
         let x = world_coord.x.floor();
         let y = world_coord.y.floor();
-        let z = heights[(x as usize, y as usize)] + 0.1;
+        let z = heights[(x as usize, y as usize)];
         WorldCoord::new(x, y, z)
     }
 
@@ -99,7 +99,6 @@ impl Avatar {
                 Rotation::Up => WorldCoord::new(position.x, position.y + 1.0, 0.0),
                 Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
                 Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
-                _ => position,
             };
             let new_position = Avatar::snap(new_position, heights);
             if (new_position.z - position.z).abs() < self.max_grade {
@@ -139,12 +138,12 @@ impl Avatar {
     pub fn draw(&self) -> Vec<Command> {
         if let Some(position) = self.position {
             vec![
-                self.draw_billboard_at_offset(position, v3(0.0, 0.0, 0.0), "body", &self.texture_body),
-                self.draw_billboard_at_offset(position, v3(1.0, 0.0, 0.0), "head", &self.texture_head),
-                self.draw_billboard_at_offset(position, v3(4.8, 1.52, 0.0), "left_eye", &self.texture_eye),
-                self.draw_billboard_at_offset(position, v3(4.8, -1.52, 0.0), "right_eye", &self.texture_eye),
-                self.draw_billboard_at_offset(position, v3(2.8, 2.8, 0.0), "left_hand", &self.texture_hand),
-                self.draw_billboard_at_offset(position, v3(2.8, -2.8, 0.0), "right_hand", &self.texture_hand),
+                self.draw_billboard_at_offset(position, v3(0.0, 0.0, 96.0), "body", &self.texture_body),
+                self.draw_billboard_at_offset(position, v3(12.0, 0.0, 192.0), "head", &self.texture_head),
+                self.draw_billboard_at_offset(position, v3(48.0, 24.0, 192.0), "left_eye", &self.texture_eye),
+                self.draw_billboard_at_offset(position, v3(48.0, -24.0, 192.0), "right_eye", &self.texture_eye),
+                self.draw_billboard_at_offset(position, v3(48.0, 50.0, 96.0), "left_hand", &self.texture_hand),
+                self.draw_billboard_at_offset(position, v3(48.0, -50.0, 96.0), "right_hand", &self.texture_hand),
                 Command::LookAt(position),
             ]
         } else {
