@@ -1,10 +1,11 @@
-use isometric::{M, v3, V3};
+use isometric::{v3, V3};
 use isometric::coords::*;
 use isometric::drawing::Billboard;
 use isometric::Command;
 use isometric::Texture;
 use std::sync::Arc;
 use std::f32::consts::PI;
+use super::world::World;
 
 enum Rotation {
     Left,
@@ -79,20 +80,14 @@ impl Avatar {
         self.rotation = self.rotation.anticlockwise();
     }
 
-    pub fn reposition(&mut self, world_coord: Option<WorldCoord>, heights: &M<f32>) {
+    pub fn reposition(&mut self, world_coord: Option<WorldCoord>, world: &World) {
         if let Some(world_coord) = world_coord {
-            self.position = Some(Avatar::snap(world_coord, heights));
+            self.position = Some(world.snap(world_coord));
         }
     }
 
-    fn snap(world_coord: WorldCoord, heights: &M<f32>) -> WorldCoord {
-        let x = world_coord.x.floor();
-        let y = world_coord.y.floor();
-        let z = heights[(x as usize, y as usize)];
-        WorldCoord::new(x, y, z)
-    }
 
-    pub fn walk(&mut self, heights: &M<f32>) {
+    pub fn walk(&mut self, world: &World) {
         if let Some(position) = self.position {
             let new_position = match self.rotation {
                 Rotation::Left => WorldCoord::new(position.x + 1.0, position.y, 0.0),
@@ -100,7 +95,7 @@ impl Avatar {
                 Rotation::Right => WorldCoord::new(position.x - 1.0, position.y, 0.0),
                 Rotation::Down => WorldCoord::new(position.x, position.y - 1.0, 0.0),
             };
-            let new_position = Avatar::snap(new_position, heights);
+            let new_position = world.snap(new_position);
             if (new_position.z - position.z).abs() < self.max_grade {
                 self.position = Some(new_position);
             }

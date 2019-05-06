@@ -1,5 +1,6 @@
 use isometric::terrain::*;
 use isometric::*;
+use isometric::coords::WorldCoord;
 use std::ops::Range;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -251,6 +252,14 @@ impl World {
         self.terrain.set_node(self.get_node(edge.from()));
         self.terrain.set_node(self.get_node(edge.to()));
     }
+
+    pub fn snap(&self, world_coord: WorldCoord) -> WorldCoord {
+        let x = world_coord.x.round();
+        let y = world_coord.y.round();
+        let z = self.terrain.elevations()[(x as usize, y as usize)];
+        WorldCoord::new(x, y, z)
+    }
+
 }
 
 
@@ -653,7 +662,14 @@ mod world_tests {
 
         assert!(!world.terrain.is_edge(&Edge::new(v2(0, 0), v2(0, 1))));
         assert!(!world.terrain.is_edge(&Edge::new(v2(0, 1), v2(1, 1))));
-        
+    }
+
+    #[test]
+    fn test_snap() {
+        assert_eq!(
+            world().snap(WorldCoord::new(0.3, 1.7, 1.2)),
+            WorldCoord::new(0.0, 2.0, 1.0)
+        );
     }
 }
 

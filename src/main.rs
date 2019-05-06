@@ -73,7 +73,6 @@ fn main() {
 }
 
 pub struct TerrainHandler {
-    heights: na::DMatrix<f32>,
     world: World,
     world_artist: WorldArtist,
     world_coord: Option<WorldCoord>,
@@ -95,7 +94,6 @@ impl TerrainHandler {
             world,
             world_artist,
             world_coord: None,
-            heights, //TODO remove
             label_editor: LabelEditor::new(),
             event_handlers: vec![
                 Box::new(HouseBuilder::new(na::Vector3::new(1.0, 0.0, 1.0))),
@@ -121,14 +119,14 @@ impl EventHandler for TerrainHandler {
                 Event::WorldPositionChanged(world_coord) => {
                     self.world_coord = Some(world_coord);
                     vec![]
-                } //self.select_cell()]},
+                },
                 Event::Key {
                     key: VirtualKeyCode::R,
                     state: ElementState::Pressed,
                     ..
                 } => {
                     if let Some(from) = self.avatar.position() {
-                        self.avatar.walk(&self.heights);
+                        self.avatar.walk(&self.world);
                         if let Some(to) = self.avatar.position() {
                             if from != to {
                                 let from = v2(from.x as usize, from.y as usize);
@@ -156,16 +154,16 @@ impl EventHandler for TerrainHandler {
                 } => match key {
                     VirtualKeyCode::L => {
                         if let Some(world_coord) = self.avatar.position() {
-                            self.label_editor.start_edit(world_coord, &self.heights);
+                            self.label_editor.start_edit(world_coord);
                         }
                         vec![]
                     }
                     VirtualKeyCode::H => {
-                        self.avatar.reposition(self.world_coord, &self.heights);
+                        self.avatar.reposition(self.world_coord, &self.world);
                         self.avatar.draw()
                     }
                     VirtualKeyCode::W => {
-                        self.avatar.walk(&self.heights);
+                        self.avatar.walk(&self.world);
                         self.avatar.draw()
                     }
                     VirtualKeyCode::A => {

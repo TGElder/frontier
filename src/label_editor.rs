@@ -6,7 +6,6 @@ use isometric::{ElementState, VirtualKeyCode};
 use isometric::Font;
 use isometric::Texture;
 use isometric::EventHandler;
-use isometric::M;
 
 use std::sync::Arc;
 
@@ -26,8 +25,8 @@ impl LabelEditor {
         }
     }
 
-    pub fn start_edit(&mut self, world_coord: WorldCoord, elevations: &M<f32>) {
-        self.edit = Some(LabelEdit::new(self.font.clone(), world_coord, elevations));
+    pub fn start_edit(&mut self, world_coord: WorldCoord) {
+        self.edit = Some(LabelEdit::new(self.font.clone(), world_coord));
     }
 }
 
@@ -60,12 +59,7 @@ struct LabelEdit {
 }
 
 impl LabelEdit {
-    pub fn new(font: Arc<Font>, world_coord: WorldCoord, elevations: &M<f32>) -> LabelEdit {
-        let x = world_coord.x.floor();
-        let y = world_coord.y.floor();
-        let z = elevations[(x as usize, y as usize)];
-        let world_coord = WorldCoord::new(x, y, z);
-
+    pub fn new(font: Arc<Font>, world_coord: WorldCoord) -> LabelEdit {
         LabelEdit {
             world_coord,
             font,
