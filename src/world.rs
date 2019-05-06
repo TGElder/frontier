@@ -26,13 +26,15 @@ impl World {
         let (width, height) = elevations.shape();
         let max_height = elevations.max();
         let rivers = World::setup_rivers(width, height, river_nodes, rivers);
+        let from = &v2(0, 0);
+        let to = &v2(width, height);
         World {
             width,
             height,
             terrain: Terrain::new(
                 elevations,
-                &rivers.get_nodes(0..width, 0..height),
-                &rivers.get_edges(0..width, 0..height),
+                &rivers.get_nodes(from, to),
+                &rivers.get_edges(from, to),
             ),
             rivers,
             roads: RoadSet::new(width, height, World::ROAD_WIDTH),

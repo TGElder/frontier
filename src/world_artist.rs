@@ -3,7 +3,6 @@ use isometric::drawing::*;
 use isometric::terrain::*;
 use isometric::*;
 use std::collections::HashSet;
-use std::ops::Range;
 
 #[derive(Hash, PartialEq, Eq, Debug)]
 struct Slab {
@@ -114,13 +113,13 @@ impl WorldArtist {
     fn get_road_river_nodes(
         &self,
         world: &World,
-        x_range: Range<usize>,
-        y_range: Range<usize>,
+        from: &V2<usize>,
+        to: &V2<usize>,
     ) -> (Vec<Node>, Vec<Node>) {
         let mut road_nodes = vec![];
         let mut river_nodes = vec![];
-        for x in x_range {
-            for y in y_range.start..y_range.end {
+        for x in from.x..to.x {
+            for y in from.y..to.y {
                 let road_node = world.roads().get_node(v2(x, y));
                 let river_node = world.rivers().get_node(v2(x, y));
                 if road_node.width() > 0.0 || road_node.height() > 0.0 {
@@ -136,14 +135,11 @@ impl WorldArtist {
     fn draw_slab_rivers_roads(&mut self, world: &World, slab: &Slab) -> Vec<Command> {
         let river_color = &Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = &Color::new(0.5, 0.5, 0.5, 1.0);
-        let river_edges = world
-            .rivers()
-            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y); //TODO can we avoid the repeated ranges here?
-        let road_edges = world
-            .roads()
-            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
-        let (road_nodes, river_nodes) =
-            self.get_road_river_nodes(world, slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let from = &slab.from;
+        let to = &slab.to();
+        let river_edges = world.rivers().get_edges(from, to);
+        let road_edges = world.roads().get_edges(from, to);
+        let (road_nodes, river_nodes) = self.get_road_river_nodes(world, from, to);
         vec![
             Command::Draw {
                 name: format!("{:?}-river-edges", slab.from),

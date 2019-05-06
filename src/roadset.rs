@@ -1,6 +1,5 @@
 use isometric::terrain::*;
 use isometric::*;
-use std::ops::Range;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 struct HalfJunction {
@@ -135,10 +134,10 @@ impl RoadSet {
         Node::new(position, width, height)
     }
 
-    pub fn get_nodes(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Node> {
+    pub fn get_nodes(&self, from: &V2<usize>, to: &V2<usize>) -> Vec<Node> {
         let mut out = vec![];
-        for x in x_range {
-            for y in y_range.start..y_range.end {
+        for x in from.x..to.x {
+            for y in from.y..to.y {
                 let node = self.get_node(v2(x, y));
                 if node.width() > 0.0 || node.height() > 0.0 {
                     out.push(node);
@@ -148,10 +147,10 @@ impl RoadSet {
         out
     }
 
-    pub fn get_edges(&self, x_range: Range<usize>, y_range: Range<usize>) -> Vec<Edge> {
+    pub fn get_edges(&self, from: &V2<usize>, to: &V2<usize>) -> Vec<Edge> {
         let mut out = vec![];
-        for x in x_range {
-            for y in y_range.start..y_range.end {
+        for x in from.x..to.x {
+            for y in from.y..to.y {
                 let from = v2(x, y);
                 let junction = self.get_junction(&from);
                 if junction.horizontal.from {
@@ -562,7 +561,7 @@ mod tests {
     #[test]
     fn test_get_nodes_l() {
         let roadset = l();
-        let actual = roadset.get_nodes(0..2, 0..2);
+        let actual = roadset.get_nodes(&v2(0, 0), &v2(2, 2));
         assert_eq!(actual.len(), 3);
         assert!(actual.contains(&Node::new(v2(0, 0), 9.0, 9.0)));
         assert!(actual.contains(&Node::new(v2(1, 0), 0.0, 9.0)));
@@ -572,7 +571,7 @@ mod tests {
     #[test]
     fn test_get_nodes_parallel() {
         let roadset = parallel();
-        let actual = roadset.get_nodes(0..2, 0..2);
+        let actual = roadset.get_nodes(&v2(0, 0), &v2(2, 2));
         assert_eq!(actual.len(), 4);
         assert!(actual.contains(&Node::new(v2(0, 0), 0.0, 9.0)));
         assert!(actual.contains(&Node::new(v2(1, 0), 0.0, 9.0)));
@@ -583,7 +582,7 @@ mod tests {
     #[test]
     fn test_get_nodes_partial() {
         let roadset = l();
-        let actual = roadset.get_nodes(0..1, 0..1);
+        let actual = roadset.get_nodes(&v2(0, 0), &v2(1, 1));
         assert_eq!(actual.len(), 1);
         assert!(actual.contains(&Node::new(v2(0, 0), 9.0, 9.0)));
     }
@@ -591,7 +590,7 @@ mod tests {
     #[test]
     fn test_get_edges_l() {
         let roadset = l();
-        let actual = roadset.get_edges(0..2, 0..2);
+        let actual = roadset.get_edges(&v2(0, 0), &v2(2, 2));
         assert_eq!(actual.len(), 2);
         assert!(actual.contains(&Edge::new(v2(0, 0), v2(1, 0))));
         assert!(actual.contains(&Edge::new(v2(0, 0), v2(0, 1))));
@@ -600,7 +599,7 @@ mod tests {
     #[test]
     fn test_get_edges_parallel() {
         let roadset = parallel();
-        let actual = roadset.get_edges(0..2, 0..2);
+        let actual = roadset.get_edges(&v2(0, 0), &v2(2, 2));
         assert_eq!(actual.len(), 2);
         assert!(actual.contains(&Edge::new(v2(0, 0), v2(1, 0))));
         assert!(actual.contains(&Edge::new(v2(0, 1), v2(1, 1))));
