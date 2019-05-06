@@ -1,8 +1,8 @@
+use super::avatar::*;
+use super::house_builder::*;
+use super::label_editor::*;
 use super::world::*;
 use super::world_artist::*;
-use super::avatar::*;
-use super::label_editor::*;
-use super::house_builder::*;
 
 use isometric::coords::*;
 use isometric::terrain::*;
@@ -24,12 +24,10 @@ pub struct GameHandler {
 }
 
 impl GameHandler {
-    pub fn new(
-        world: World,
-    ) -> GameHandler {
+    pub fn new(world: World) -> GameHandler {
         let cliff_gradient = 0.53;
         let light_direction = V3::new(-1.0, 0.0, 1.0);
-        let world_artist = WorldArtist::new(&world, 64, cliff_gradient, light_direction); 
+        let world_artist = WorldArtist::new(&world, 64, cliff_gradient, light_direction);
         GameHandler {
             house_builder: HouseBuilder::new(world.width(), world.height(), light_direction),
             world,
@@ -56,8 +54,8 @@ impl GameHandler {
                 let mut commands = self.world_artist.draw_affected(&self.world, vec![from, to]);
                 commands.append(&mut self.avatar.draw());
                 commands
-            },
-            _ => vec![]
+            }
+            _ => vec![],
         }
     }
 
@@ -86,47 +84,47 @@ impl EventHandler for GameHandler {
         if !label_commands.is_empty() {
             label_commands
         } else {
-           match *event {
-            Event::Start => self.world_artist.init(&self.world),
-            Event::WorldPositionChanged(world_coord) => {
-                self.world_coord = Some(world_coord);
-                vec![]
-            },
-            Event::Key {
-                key,
-                state: ElementState::Pressed,
-                ..
-            } => match key {
-                VirtualKeyCode::H => {
-                    self.avatar.reposition(self.world_coord, &self.world);
-                    self.avatar.draw()
-                }
-                VirtualKeyCode::W => {
-                    self.avatar.walk(&self.world);
-                    self.avatar.draw()
-                }
-                VirtualKeyCode::A => {
-                    self.avatar.rotate_anticlockwise();
-                    self.avatar.draw()
-                }
-                VirtualKeyCode::D => {
-                    self.avatar.rotate_clockwise();
-                    self.avatar.draw()
-                }
-                VirtualKeyCode::Q => self.rotate(PI / 4.0),
-                VirtualKeyCode::E => self.rotate(-PI / 4.0),
-                VirtualKeyCode::R => self.build_road(),
-                VirtualKeyCode::L => {
-                    if let Some(world_coord) = self.avatar.position() {
-                        self.label_editor.start_edit(world_coord);
-                    }
+            match *event {
+                Event::Start => self.world_artist.init(&self.world),
+                Event::WorldPositionChanged(world_coord) => {
+                    self.world_coord = Some(world_coord);
                     vec![]
+                }
+                Event::Key {
+                    key,
+                    state: ElementState::Pressed,
+                    ..
+                } => match key {
+                    VirtualKeyCode::H => {
+                        self.avatar.reposition(self.world_coord, &self.world);
+                        self.avatar.draw()
+                    }
+                    VirtualKeyCode::W => {
+                        self.avatar.walk(&self.world);
+                        self.avatar.draw()
+                    }
+                    VirtualKeyCode::A => {
+                        self.avatar.rotate_anticlockwise();
+                        self.avatar.draw()
+                    }
+                    VirtualKeyCode::D => {
+                        self.avatar.rotate_clockwise();
+                        self.avatar.draw()
+                    }
+                    VirtualKeyCode::Q => self.rotate(PI / 16.0),
+                    VirtualKeyCode::E => self.rotate(-PI / 16.0),
+                    VirtualKeyCode::R => self.build_road(),
+                    VirtualKeyCode::L => {
+                        if let Some(world_coord) = self.avatar.position() {
+                            self.label_editor.start_edit(world_coord);
+                        }
+                        vec![]
+                    }
+                    VirtualKeyCode::B => self.build_house(),
+                    _ => vec![],
                 },
-                VirtualKeyCode::B => self.build_house(),
                 _ => vec![],
-            },
-            _ => vec![],
-           }
+            }
         }
     }
 }

@@ -1,11 +1,11 @@
-use isometric::{v3, V3};
+use super::world::World;
 use isometric::coords::*;
 use isometric::drawing::Billboard;
 use isometric::Command;
 use isometric::Texture;
-use std::sync::Arc;
+use isometric::{v3, V3};
 use std::f32::consts::PI;
-use super::world::World;
+use std::sync::Arc;
 
 enum Rotation {
     Left,
@@ -112,32 +112,66 @@ impl Avatar {
         ])
     }
 
-    pub fn draw_billboard_at_offset(&self, position: WorldCoord, offset: V3<f32>, handle: &str, texture: &Arc<Texture>) -> Command {
+    pub fn draw_billboard_at_offset(
+        &self,
+        position: WorldCoord,
+        offset: V3<f32>,
+        handle: &str,
+        texture: &Arc<Texture>,
+    ) -> Command {
         let offset = self.get_rotation_matrix() * offset * self.scale;
-        let position = WorldCoord::new(position.x + offset.x, position.y + offset.y, position.z + offset.z);
+        let position = WorldCoord::new(
+            position.x + offset.x,
+            position.y + offset.y,
+            position.z + offset.z,
+        );
         let width = (texture.width() as f32) * self.scale;
         let height = (texture.height() as f32) * self.scale;
         Command::Draw {
             name: handle.to_string(),
-            drawing: Box::new(Billboard::new(
-                position,
-                width,
-                height,
-                texture.clone(),
-            )),
+            drawing: Box::new(Billboard::new(position, width, height, texture.clone())),
         }
-
     }
 
     pub fn draw(&self) -> Vec<Command> {
         if let Some(position) = self.position {
             vec![
-                self.draw_billboard_at_offset(position, v3(0.0, 0.0, 96.0), "body", &self.texture_body),
-                self.draw_billboard_at_offset(position, v3(12.0, 0.0, 192.0), "head", &self.texture_head),
-                self.draw_billboard_at_offset(position, v3(48.0, 24.0, 192.0), "left_eye", &self.texture_eye),
-                self.draw_billboard_at_offset(position, v3(48.0, -24.0, 192.0), "right_eye", &self.texture_eye),
-                self.draw_billboard_at_offset(position, v3(48.0, 50.0, 96.0), "left_hand", &self.texture_hand),
-                self.draw_billboard_at_offset(position, v3(48.0, -50.0, 96.0), "right_hand", &self.texture_hand),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(0.0, 0.0, 96.0),
+                    "body",
+                    &self.texture_body,
+                ),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(12.0, 0.0, 192.0),
+                    "head",
+                    &self.texture_head,
+                ),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(48.0, 24.0, 192.0),
+                    "left_eye",
+                    &self.texture_eye,
+                ),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(48.0, -24.0, 192.0),
+                    "right_eye",
+                    &self.texture_eye,
+                ),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(48.0, 50.0, 96.0),
+                    "left_hand",
+                    &self.texture_hand,
+                ),
+                self.draw_billboard_at_offset(
+                    position,
+                    v3(48.0, -50.0, 96.0),
+                    "right_hand",
+                    &self.texture_hand,
+                ),
                 Command::LookAt(position),
             ]
         } else {
@@ -145,4 +179,3 @@ impl Avatar {
         }
     }
 }
-

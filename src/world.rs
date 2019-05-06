@@ -1,6 +1,6 @@
+use isometric::coords::WorldCoord;
 use isometric::terrain::*;
 use isometric::*;
-use isometric::coords::WorldCoord;
 use std::ops::Range;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -11,8 +11,12 @@ struct HalfJunction {
 }
 
 impl HalfJunction {
-    fn new(width: f32) -> HalfJunction{
-        HalfJunction{width, from: false, to: false}
+    fn new(width: f32) -> HalfJunction {
+        HalfJunction {
+            width,
+            from: false,
+            to: false,
+        }
     }
 
     fn any(&self) -> bool {
@@ -22,8 +26,7 @@ impl HalfJunction {
     fn width(&self) -> f32 {
         if self.any() {
             self.width
-        }
-        else {
+        } else {
             0.0
         }
     }
@@ -37,7 +40,10 @@ struct Junction {
 
 impl Junction {
     fn new(width: f32) -> Junction {
-        Junction{horizontal: HalfJunction::new(width), vertical: HalfJunction::new(width)}
+        Junction {
+            horizontal: HalfJunction::new(width),
+            vertical: HalfJunction::new(width),
+        }
     }
 }
 
@@ -47,7 +53,7 @@ pub struct RoadSet {
 
 impl RoadSet {
     pub fn new(width: usize, height: usize, road_width: f32) -> RoadSet {
-        RoadSet{
+        RoadSet {
             junctions: M::from_element(width, height, Junction::new(road_width)),
         }
     }
@@ -69,7 +75,7 @@ impl RoadSet {
             if node.height() > 0.0 {
                 junction.horizontal.width = node.height();
             }
-        }    
+        }
     }
 
     pub fn add_road(&mut self, road: &Edge) {
@@ -92,7 +98,7 @@ impl RoadSet {
             self.add_road(edge);
         }
     }
-    
+
     pub fn clear_road(&mut self, road: &Edge) {
         let mut from_junction = self.get_junction_mut(road.from());
         if road.horizontal() {
@@ -151,7 +157,7 @@ impl RoadSet {
                 let junction = self.get_junction(&from);
                 if junction.horizontal.from {
                     out.push(Edge::new(from, v2(x + 1, y)));
-                } 
+                }
                 if junction.vertical.from {
                     out.push(Edge::new(from, v2(x, y + 1)));
                 }
@@ -172,17 +178,25 @@ pub struct World {
 }
 
 impl World {
-
     const ROAD_WIDTH: f32 = 0.05;
-    
-    pub fn new(elevations: M<f32>, river_nodes: Vec<Node>, rivers: Vec<Edge>, sea_level: f32) -> World {
+
+    pub fn new(
+        elevations: M<f32>,
+        river_nodes: Vec<Node>,
+        rivers: Vec<Edge>,
+        sea_level: f32,
+    ) -> World {
         let (width, height) = elevations.shape();
         let max_height = elevations.max();
         let rivers = World::setup_rivers(width, height, river_nodes, rivers);
-        World{
+        World {
             width,
             height,
-            terrain: Terrain::new(elevations, &rivers.get_nodes(0..width, 0..height), &rivers.get_edges(0..width, 0..height)),
+            terrain: Terrain::new(
+                elevations,
+                &rivers.get_nodes(0..width, 0..height),
+                &rivers.get_edges(0..width, 0..height),
+            ),
             rivers,
             roads: RoadSet::new(width, height, World::ROAD_WIDTH),
             sea_level,
@@ -218,7 +232,12 @@ impl World {
         self.max_height
     }
 
-    fn setup_rivers(width: usize, height: usize, river_nodes: Vec<Node>, rivers: Vec<Edge>) -> RoadSet {
+    fn setup_rivers(
+        width: usize,
+        height: usize,
+        river_nodes: Vec<Node>,
+        rivers: Vec<Edge>,
+    ) -> RoadSet {
         let mut out = RoadSet::new(width, height, 0.0);
         out.set_widths_from_nodes(&river_nodes);
         out.add_roads(&rivers);
@@ -226,11 +245,15 @@ impl World {
     }
 
     fn get_horizontal_width(&self, position: &V2<usize>) -> f32 {
-        self.rivers.get_horizontal_width(position).max(self.roads.get_horizontal_width(position))
+        self.rivers
+            .get_horizontal_width(position)
+            .max(self.roads.get_horizontal_width(position))
     }
 
     fn get_vertical_width(&self, position: &V2<usize>) -> f32 {
-        self.rivers.get_vertical_width(position).max(self.roads.get_vertical_width(position))
+        self.rivers
+            .get_vertical_width(position)
+            .max(self.roads.get_vertical_width(position))
     }
 
     fn is_river_or_road(&self, edge: &Edge) -> bool {
@@ -267,7 +290,7 @@ impl World {
             self.terrain.set_edge(edge);
         } else {
             self.terrain.clear_edge(edge);
-        }    
+        }
         self.terrain.set_node(self.get_node(edge.from()));
         self.terrain.set_node(self.get_node(edge.to()));
     }
@@ -290,10 +313,7 @@ impl World {
         }
         WorldCoord::new(x + 0.5, y + 0.5, z)
     }
-
 }
-
-
 
 #[cfg(test)]
 mod roadset_tests {
@@ -325,52 +345,114 @@ mod roadset_tests {
             Node::new(v2(0, 1), 0.5, 0.6),
             Node::new(v2(1, 1), 0.7, 0.8),
         ]);
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 0.2, from: true, to: false },
-                vertical: HalfJunction{ width: 0.1, from: true, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 0.2,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 0.1,
+                    from: true,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 0.4, from: false, to: true },
-                vertical: HalfJunction{ width: 0.3, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 0.4,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 0.3,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(0, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 0.6, from: false, to: false },
-                vertical: HalfJunction{ width: 0.5, from: false, to: true }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 0.6,
+                    from: false,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 0.5,
+                    from: false,
+                    to: true
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 0.8, from: false, to: false },
-                vertical: HalfJunction{ width: 0.7, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 0.8,
+                    from: false,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 0.7,
+                    from: false,
+                    to: false
+                }
             }
         );
-
     }
 
     #[test]
     fn test_add_road_l() {
         let roadset = l();
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: true, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(0, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: true }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                }
             }
         );
         assert_eq!(roadset.get_junction(&v2(1, 1)), &Junction::new(9.0));
@@ -379,28 +461,64 @@ mod roadset_tests {
     #[test]
     fn test_add_road_parallel() {
         let roadset = parallel();
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(0, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
     }
@@ -410,24 +528,51 @@ mod roadset_tests {
         let mut roadset = RoadSet::new(2, 2, 9.0);
         roadset.add_roads(&vec![
             Edge::new(v2(0, 0), v2(1, 0)),
-            Edge::new(v2(0, 0), v2(0, 1))
+            Edge::new(v2(0, 0), v2(0, 1)),
         ]);
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: true, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(0, 1)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: true }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 1)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                }
             }
         );
         assert_eq!(roadset.get_junction(&v2(1, 1)), &Junction::new(9.0));
@@ -437,16 +582,34 @@ mod roadset_tests {
     fn test_clear_road_l() {
         let mut roadset = l();
         roadset.clear_road(&Edge::new(v2(0, 0), v2(0, 1)));
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
         assert_eq!(roadset.get_junction(&v2(0, 1)), &Junction::new(9.0));
@@ -457,16 +620,34 @@ mod roadset_tests {
     fn test_clear_road_parallel() {
         let mut roadset = parallel();
         roadset.clear_road(&Edge::new(v2(0, 1), v2(1, 1)));
-        assert_eq!(roadset.get_junction(&v2(0, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: true, to: false },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(0, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: true,
+                    to: false
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
-        assert_eq!(roadset.get_junction(&v2(1, 0)),
-            &Junction{
-                horizontal: HalfJunction{ width: 9.0, from: false, to: true },
-                vertical: HalfJunction{ width: 9.0, from: false, to: false }
+        assert_eq!(
+            roadset.get_junction(&v2(1, 0)),
+            &Junction {
+                horizontal: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: true
+                },
+                vertical: HalfJunction {
+                    width: 9.0,
+                    from: false,
+                    to: false
+                }
             }
         );
         assert_eq!(roadset.get_junction(&v2(0, 1)), &Junction::new(9.0));
@@ -500,7 +681,6 @@ mod roadset_tests {
         assert!(!roadset.is_road(&Edge::new(v2(1, 0), v2(1, 1))));
     }
 
-
     #[test]
     fn test_get_horizontal_width_parallel() {
         let roadset = parallel();
@@ -519,7 +699,7 @@ mod roadset_tests {
         assert_eq!(roadset.get_vertical_width(&v2(1, 1)), 0.0);
     }
 
-     #[test]
+    #[test]
     fn test_is_road_parallel() {
         let roadset = parallel();
         assert!(roadset.is_road(&Edge::new(v2(0, 0), v2(1, 0))));
@@ -579,7 +759,7 @@ mod roadset_tests {
 
 #[cfg(test)]
 mod world_tests {
-    
+
     use super::*;
 
     #[rustfmt::skip]
@@ -708,7 +888,7 @@ mod world_tests {
         );
     }
 
-      #[test]
+    #[test]
     fn test_snap_middle() {
         assert_eq!(
             world().snap_middle(WorldCoord::new(0.3, 1.7, 1.2)),
@@ -716,4 +896,3 @@ mod world_tests {
         );
     }
 }
-

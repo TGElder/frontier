@@ -24,7 +24,6 @@ impl HouseBuilder {
         self.houses[index] = !self.houses[index];
         let name = format!("house-{:?}", index);
         if self.houses[index] {
-
             let drawing = HouseDrawing::new(
                 world_coord,
                 0.25,

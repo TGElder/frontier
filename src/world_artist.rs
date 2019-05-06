@@ -1,9 +1,9 @@
+use super::world::World;
+use isometric::drawing::*;
 use isometric::terrain::*;
 use isometric::*;
-use isometric::drawing::*;
 use std::collections::HashSet;
 use std::ops::Range;
-use super::world::World;
 
 #[derive(Hash, PartialEq, Eq, Debug)]
 struct Slab {
@@ -14,7 +14,7 @@ struct Slab {
 impl Slab {
     fn new(point: V2<usize>, slab_size: usize) -> Slab {
         let from = (point / slab_size) * slab_size;
-        Slab{from, slab_size}
+        Slab { from, slab_size }
     }
 
     fn to(&self) -> V2<usize> {
@@ -32,16 +32,20 @@ pub struct WorldArtist {
 }
 
 impl WorldArtist {
-
-    pub fn new(world: &World, slab_size: usize, cliff_gradient: f32, light_direction: V3<f32>) -> WorldArtist {
+    pub fn new(
+        world: &World,
+        slab_size: usize,
+        cliff_gradient: f32,
+        light_direction: V3<f32>,
+    ) -> WorldArtist {
         let (width, height) = world.terrain().elevations().shape();
-        WorldArtist{
+        WorldArtist {
             width,
             height,
             drawing: TerrainDrawing::new(width, height, slab_size),
             colors: WorldArtist::get_colors(world, cliff_gradient),
             shading: WorldArtist::get_shading(light_direction),
-            slab_size
+            slab_size,
         }
     }
 
@@ -107,12 +111,18 @@ impl WorldArtist {
     }
 
     fn draw_slab_tiles(&mut self, world: &World, slab: &Slab) {
-        let to = slab.to(); 
+        let to = slab.to();
         let to = v2(to.x.min(self.width - 1), to.y.min(self.height - 1));
-        self.drawing.update(world.terrain(), &self.colors, &self.shading, slab.from, to);
+        self.drawing
+            .update(world.terrain(), &self.colors, &self.shading, slab.from, to);
     }
 
-    fn get_road_river_nodes(&self, world: &World, x_range: Range<usize>, y_range: Range<usize>) -> (Vec<Node>, Vec<Node>) {
+    fn get_road_river_nodes(
+        &self,
+        world: &World,
+        x_range: Range<usize>,
+        y_range: Range<usize>,
+    ) -> (Vec<Node>, Vec<Node>) {
         let mut road_nodes = vec![];
         let mut river_nodes = vec![];
         for x in x_range {
@@ -129,51 +139,53 @@ impl WorldArtist {
         (road_nodes, river_nodes)
     }
 
-    fn draw_slab_rivers_roads(&mut self,
-        world: &World,
-        slab: &Slab
-    ) -> Vec<Command> {
+    fn draw_slab_rivers_roads(&mut self, world: &World, slab: &Slab) -> Vec<Command> {
         let river_color = &Color::new(0.0, 0.0, 1.0, 1.0);
         let road_color = &Color::new(0.5, 0.5, 0.5, 1.0);
-        let river_edges = world.rivers().get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
-        let road_edges = world.roads().get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
-        let (road_nodes, river_nodes) = self.get_road_river_nodes(world, slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let river_edges = world
+            .rivers()
+            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let road_edges = world
+            .roads()
+            .get_edges(slab.from.x..slab.to().x, slab.from.y..slab.to().y);
+        let (road_nodes, river_nodes) =
+            self.get_road_river_nodes(world, slab.from.x..slab.to().x, slab.from.y..slab.to().y);
         vec![
-            Command::Draw{
+            Command::Draw {
                 name: format!("{:?}-river-edges", slab.from),
                 drawing: Box::new(EdgeDrawing::new(
                     world.terrain(),
                     &river_edges,
                     &river_color,
-                    0.0
-                ))
+                    0.0,
+                )),
             },
-            Command::Draw{
+            Command::Draw {
                 name: format!("{:?}-road-edges", slab.from),
                 drawing: Box::new(EdgeDrawing::new(
                     world.terrain(),
                     &road_edges,
                     &road_color,
-                    0.0
-                ))
+                    0.0,
+                )),
             },
-            Command::Draw{
+            Command::Draw {
                 name: format!("{:?}-river-nodes", slab.from),
                 drawing: Box::new(NodeDrawing::new(
                     world.terrain(),
                     &river_nodes,
                     &river_color,
-                    0.0
-                ))
+                    0.0,
+                )),
             },
-            Command::Draw{
+            Command::Draw {
                 name: format!("{:?}-road-nodes", slab.from),
                 drawing: Box::new(NodeDrawing::new(
                     world.terrain(),
                     &road_nodes,
                     &road_color,
-                    0.0
-                ))
+                    0.0,
+                )),
             },
         ]
     }
@@ -182,14 +194,16 @@ impl WorldArtist {
         let mut out = vec![];
         for slab in slabs {
             out.append(&mut self.draw_slab(world, &slab));
-
         }
         out.push(self.draw_terrain());
         out
     }
 
     fn get_affected_slabs(&self, positions: Vec<V2<usize>>) -> HashSet<Slab> {
-        positions.into_iter().map(|position| Slab::new(position, self.slab_size)).collect()
+        positions
+            .into_iter()
+            .map(|position| Slab::new(position, self.slab_size))
+            .collect()
     }
 
     pub fn draw_affected(&mut self, world: &World, positions: Vec<V2<usize>>) -> Vec<Command> {
@@ -200,10 +214,7 @@ impl WorldArtist {
         let mut out = HashSet::new();
         for x in 0..self.width / self.slab_size {
             for y in 0..self.height / self.slab_size {
-                let from = v2(
-                    x * self.slab_size,
-                    y * self.slab_size
-                );
+                let from = v2(x * self.slab_size, y * self.slab_size);
                 out.insert(Slab::new(from, self.slab_size));
             }
         }
@@ -221,7 +232,6 @@ impl WorldArtist {
         out.append(&mut self.draw_all(world));
         out
     }
-
 }
 
 #[cfg(test)]
@@ -229,21 +239,20 @@ mod tests {
 
     use super::*;
 
-
     #[test]
     fn slab_new() {
-        assert_eq!(Slab::new(v2(11, 33), 32),
-        Slab{
-            from: v2(0, 32),
-            slab_size: 32,
-        });
+        assert_eq!(
+            Slab::new(v2(11, 33), 32),
+            Slab {
+                from: v2(0, 32),
+                slab_size: 32,
+            }
+        );
     }
 
     #[test]
     fn slab_to() {
-        assert_eq!(Slab::new(v2(11, 33), 32).to(),
-        v2(32, 64)
-        );
+        assert_eq!(Slab::new(v2(11, 33), 32).to(), v2(32, 64));
     }
 
 }

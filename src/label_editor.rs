@@ -1,11 +1,11 @@
 use isometric::coords::WorldCoord;
 use isometric::drawing::Text;
 use isometric::event_handlers::TextEditor;
-use isometric::{Command, Event};
-use isometric::{ElementState, VirtualKeyCode};
+use isometric::EventHandler;
 use isometric::Font;
 use isometric::Texture;
-use isometric::EventHandler;
+use isometric::{Command, Event};
+use isometric::{ElementState, VirtualKeyCode};
 
 use std::sync::Arc;
 
@@ -47,9 +47,7 @@ impl EventHandler for LabelEditor {
         } else {
             vec![]
         }
-
     }
-
 }
 
 struct LabelEdit {

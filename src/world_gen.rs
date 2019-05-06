@@ -1,11 +1,11 @@
+use super::world::World;
 use pioneer::erosion::Erosion;
 use pioneer::mesh::Mesh;
 use pioneer::mesh_splitter::MeshSplitter;
+use pioneer::rand::prelude::*;
 use pioneer::river_runner::get_junctions_and_rivers;
 use pioneer::scale::Scale;
-use pioneer::rand::prelude::*;
 use std::f64::MAX;
-use super::world::World;
 
 pub fn generate_world(size: usize, seed: u8) -> World {
     let mut mesh = Mesh::new(1, 0.0);

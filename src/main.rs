@@ -1,16 +1,16 @@
 extern crate nalgebra as na;
 
+use game_handler::*;
 use isometric::IsometricEngine;
 use world_gen::*;
-use game_handler::*;
 
+mod avatar;
+mod game_handler;
+mod house_builder;
+mod label_editor;
 mod world;
 mod world_artist;
-mod avatar;
-mod label_editor;
 mod world_gen;
-mod house_builder;
-mod game_handler;
 
 fn main() {
     let world = generate_world(9, 77);
