@@ -182,9 +182,12 @@ impl World {
     }
 
     pub fn get_rise(&self, edge: &Edge) -> Option<f32> {
-        match (self.get_elevation(edge.from()), self.get_elevation(edge.to())) {
+        match (
+            self.get_elevation(edge.from()),
+            self.get_elevation(edge.to()),
+        ) {
             (Some(from), Some(to)) => Some(to - from),
-            _ => None
+            _ => None,
         }
     }
 
@@ -216,16 +219,8 @@ impl World {
 
     pub fn expand_position(&self, position: &V2<usize>) -> Vec<V2<usize>> {
         let mut out = vec![];
-        let fx = if position.x == 0 {
-            0
-        } else {
-            position.x - 1
-        };
-        let fy = if position.y == 0 {
-            0
-        } else {
-            position.y - 1
-        };
+        let fx = if position.x == 0 { 0 } else { position.x - 1 };
+        let fy = if position.y == 0 { 0 } else { position.y - 1 };
         for x in fx..position.x + 2 {
             for y in fy..position.y + 2 {
                 let position = v2(x, y);
@@ -236,7 +231,6 @@ impl World {
         }
         out
     }
-
 }
 
 #[cfg(test)]
@@ -399,7 +393,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_in_bounds() {
         assert!(world().in_bounds(&v2(1, 1)));
@@ -415,9 +408,18 @@ mod tests {
 
     #[test]
     fn test_get_rise() {
-        assert_eq!(world().get_rise(&Edge::new(v2(1, 0), v2(1, 1))).unwrap(), 1.0);
-        assert_eq!(world().get_rise(&Edge::new(v2(1, 1), v2(2, 1))).unwrap(), -1.0);
-        assert_eq!(world().get_rise(&Edge::new(v2(0, 0), v2(1, 0))).unwrap(), 0.0);
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(1, 0), v2(1, 1))).unwrap(),
+            1.0
+        );
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(1, 1), v2(2, 1))).unwrap(),
+            -1.0
+        );
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(0, 0), v2(1, 0))).unwrap(),
+            0.0
+        );
     }
 
     #[test]
@@ -459,7 +461,7 @@ mod tests {
         assert!(actual.contains(&v2(0, 1)));
         assert!(actual.contains(&v2(1, 1)));
     }
-    
+
     #[test]
     fn test_expand_bottom_right_corner() {
         let actual = world().expand_position(&v2(2, 2));
