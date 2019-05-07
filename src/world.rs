@@ -169,18 +169,32 @@ impl World {
             .collect()
     }
 
-    pub fn get_elevation(&self, position: &V2<usize>) -> f32 {
-        self.terrain.elevations()[(position.x, position.y)]
+    pub fn in_bounds(&self, position: &V2<usize>) -> bool {
+        position.x < self.width && position.y < self.height
     }
 
-    pub fn get_rise(&self, edge: &Edge) -> f32 {
-        self.get_elevation(edge.to()) - self.get_elevation(edge.from())
+    pub fn get_elevation(&self, position: &V2<usize>) -> Option<f32> {
+        if self.in_bounds(&position) {
+            Some(self.terrain.elevations()[(position.x, position.y)])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_rise(&self, edge: &Edge) -> Option<f32> {
+        match (
+            self.get_elevation(edge.from()),
+            self.get_elevation(edge.to()),
+        ) {
+            (Some(from), Some(to)) => Some(to - from),
+            _ => None,
+        }
     }
 
     pub fn get_lowest_corner(&self, position: &V2<usize>) -> f32 {
         self.get_corners(&position)
             .iter()
-            .map(|corner| self.get_elevation(corner))
+            .flat_map(|corner| self.get_elevation(corner))
             .min_by(float_ordering)
             .unwrap()
     }
@@ -189,7 +203,7 @@ impl World {
     pub fn get_highest_corner(&self, position: &V2<usize>) -> f32 {
         self.get_corners(&position)
             .iter()
-            .map(|corner| self.get_elevation(corner))
+            .flat_map(|corner| self.get_elevation(corner))
             .max_by(float_ordering)
             .unwrap()
     }
@@ -197,9 +211,25 @@ impl World {
     pub fn get_max_abs_rise(&self, position: &V2<usize>) -> f32 {
         self.get_border(&position)
             .iter()
-            .map(|edge| self.get_rise(edge).abs())
+            .flat_map(|edge| self.get_rise(edge))
+            .map(|rise| rise.abs())
             .max_by(float_ordering)
             .unwrap()
+    }
+
+    pub fn expand_position(&self, position: &V2<usize>) -> Vec<V2<usize>> {
+        let mut out = vec![];
+        let fx = if position.x == 0 { 0 } else { position.x - 1 };
+        let fy = if position.y == 0 { 0 } else { position.y - 1 };
+        for x in fx..position.x + 2 {
+            for y in fy..position.y + 2 {
+                let position = v2(x, y);
+                if self.in_bounds(&position) {
+                    out.push(position);
+                }
+            }
+        }
+        out
     }
 }
 
@@ -364,15 +394,32 @@ mod tests {
     }
 
     #[test]
+    fn test_in_bounds() {
+        assert!(world().in_bounds(&v2(1, 1)));
+        assert!(!world().in_bounds(&v2(3, 1)));
+        assert!(!world().in_bounds(&v2(1, 3)));
+        assert!(!world().in_bounds(&v2(3, 3)));
+    }
+
+    #[test]
     fn test_get_elevation() {
-        assert_eq!(world().get_elevation(&v2(1, 1)), 2.0);
+        assert_eq!(world().get_elevation(&v2(1, 1)).unwrap(), 2.0);
     }
 
     #[test]
     fn test_get_rise() {
-        assert_eq!(world().get_rise(&Edge::new(v2(1, 0), v2(1, 1))), 1.0);
-        assert_eq!(world().get_rise(&Edge::new(v2(1, 1), v2(2, 1))), -1.0);
-        assert_eq!(world().get_rise(&Edge::new(v2(0, 0), v2(1, 0))), 0.0);
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(1, 0), v2(1, 1))).unwrap(),
+            1.0
+        );
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(1, 1), v2(2, 1))).unwrap(),
+            -1.0
+        );
+        assert_eq!(
+            world().get_rise(&Edge::new(v2(0, 0), v2(1, 0))).unwrap(),
+            0.0
+        );
     }
 
     #[test]
@@ -388,5 +435,40 @@ mod tests {
     #[test]
     fn test_get_max_abs_rise() {
         assert_eq!(world().get_max_abs_rise(&v2(0, 0)), 1.0);
+    }
+
+    #[test]
+    fn test_expand() {
+        let actual = world().expand_position(&v2(1, 1));
+        assert_eq!(actual.len(), 9);
+        assert!(actual.contains(&v2(0, 0)));
+        assert!(actual.contains(&v2(1, 0)));
+        assert!(actual.contains(&v2(2, 0)));
+        assert!(actual.contains(&v2(0, 1)));
+        assert!(actual.contains(&v2(1, 1)));
+        assert!(actual.contains(&v2(1, 1)));
+        assert!(actual.contains(&v2(0, 2)));
+        assert!(actual.contains(&v2(1, 2)));
+        assert!(actual.contains(&v2(2, 2)));
+    }
+
+    #[test]
+    fn test_expand_top_left_corner() {
+        let actual = world().expand_position(&v2(0, 0));
+        assert_eq!(actual.len(), 4);
+        assert!(actual.contains(&v2(0, 0)));
+        assert!(actual.contains(&v2(1, 0)));
+        assert!(actual.contains(&v2(0, 1)));
+        assert!(actual.contains(&v2(1, 1)));
+    }
+
+    #[test]
+    fn test_expand_bottom_right_corner() {
+        let actual = world().expand_position(&v2(2, 2));
+        assert_eq!(actual.len(), 4);
+        assert!(actual.contains(&v2(2, 2)));
+        assert!(actual.contains(&v2(2, 1)));
+        assert!(actual.contains(&v2(1, 2)));
+        assert!(actual.contains(&v2(1, 1)));
     }
 }

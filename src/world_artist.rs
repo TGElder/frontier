@@ -189,15 +189,16 @@ impl WorldArtist {
         out
     }
 
-    fn get_affected_slabs(&self, positions: Vec<V2<usize>>) -> HashSet<Slab> {
+    fn get_affected_slabs(&self, world: &World, positions: Vec<V2<usize>>) -> HashSet<Slab> {
         positions
             .into_iter()
+            .flat_map(|position| world.expand_position(&position))
             .map(|position| Slab::new(position, self.slab_size))
             .collect()
     }
 
     pub fn draw_affected(&mut self, world: &World, positions: Vec<V2<usize>>) -> Vec<Command> {
-        self.draw_slabs(world, self.get_affected_slabs(positions))
+        self.draw_slabs(world, self.get_affected_slabs(world, positions))
     }
 
     fn get_all_slabs(&self) -> HashSet<Slab> {
